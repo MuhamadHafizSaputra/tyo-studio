@@ -5,13 +5,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --primary-color: #00b894;
+  /* Mint Green */
+  --secondary-color: #ff7675;
+  /* Salmon Pink */
 }
 
 body {
