@@ -1,21 +1,31 @@
+// src/components/Navbar.tsx
 import React from 'react';
+import { Link } from 'react-router-dom'; // Import Link
 
 const Navbar: React.FC = () => {
   return (
     <nav style={styles.nav}>
       <div className="container" style={styles.container}>
-        {/* Logo Placeholder */}
-        <div style={styles.logo}>Logo</div>
+        {/* Logo Link to Home */}
+        <div style={styles.logo}>
+            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>Logo</Link>
+        </div>
 
         {/* Menu Links */}
         <ul style={styles.menu}>
-          {['Home', 'Artikel', 'Check IMT', 'About Us'].map((item) => (
-            <li key={item} style={styles.menuItem}>
-              <a href={`#${item.toLowerCase().replace(' ', '-')}`} style={styles.link}>
-                {item}
-              </a>
+            <li style={styles.menuItem}>
+                <Link to="/" style={styles.link}>Home</Link>
             </li>
-          ))}
+            <li style={styles.menuItem}>
+                <a href="#artikel" style={styles.link}>Artikel</a>
+            </li>
+            <li style={styles.menuItem}>
+                {/* Link to the Calculator Route */}
+                <Link to="/calculator" style={styles.link}>Check IMT</Link>
+            </li>
+            <li style={styles.menuItem}>
+                <a href="#about-us" style={styles.link}>About Us</a>
+            </li>
         </ul>
 
         {/* Login Button */}
@@ -40,6 +50,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: '5px 15px',
     fontWeight: 'bold',
     borderRadius: '4px',
+    cursor: 'pointer',
   },
   menu: {
     display: 'flex',

@@ -1,3 +1,6 @@
+// src/components/Hero.tsx
+// Add this import at the top
+import { useNavigate } from 'react-router-dom';
 import React from 'react';
 
 const Hero: React.FC = () => {

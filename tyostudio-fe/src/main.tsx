@@ -1,12 +1,14 @@
+// src/main.tsx
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom' // Import BrowserRouter
 import './index.css'
-import LandingPage from './Pages/LandingPage.tsx'
-import CalculatorIMT from './Pages/CalculatorIMT.tsx'
+import App from './App' // Import the new App component
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LandingPage />
-    <CalculatorIMT />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </StrictMode>,
 )
