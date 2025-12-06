@@ -1,5 +1,4 @@
 import React from 'react';
-import Navbar from '../../components/Navbar';
 import ProfileForm from '../../components/ProfileForm';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
@@ -28,8 +27,6 @@ export default async function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      <Navbar />
-
       <main className="container mx-auto px-4 py-10 flex flex-col items-center">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Lengkapi Profil</h1>
         <p className="text-gray-500 mb-8 text-center">

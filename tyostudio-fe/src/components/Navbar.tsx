@@ -20,6 +20,7 @@ const Navbar = async () => {
           {[
             { name: 'Home', path: '/' },
             { name: 'Cek Si Kecil', path: '/cek-sikecil' },
+            { name: 'Cek Nutrisi', path: '/cek-nutrisi' },
             { name: 'Track Si Kecil', path: '/track' },
           ].map((item) => (
             <li key={item.name}>

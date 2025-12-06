@@ -1,5 +1,3 @@
-import React from 'react';
-
 const Features: React.FC = () => {
   const features = [
     {
@@ -25,79 +23,25 @@ const Features: React.FC = () => {
   ];
 
   return (
-    <section className="container" style={styles.section}>
-      <div style={styles.header}>
-        <h2 style={styles.heading}>Fitur Unggulan Kami</h2>
-        <p style={styles.subHeading}>Solusi lengkap untuk mencegah stunting sejak dini</p>
+    <section className="container mx-auto px-5 py-16">
+      <div className="text-center mb-12">
+        <h2 className="text-3xl md:text-4xl font-bold text-[var(--primary-color)] mb-3">Fitur Unggulan Kami</h2>
+        <p className="text-gray-600 text-base md:text-lg">Solusi lengkap untuk mencegah stunting sejak dini</p>
       </div>
-      
-      <div style={styles.grid}>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {features.map((item, index) => (
-          <div key={index} style={styles.card}>
-            <div style={styles.iconBox}>{item.icon}</div>
-            <h3 style={styles.cardTitle}>{item.title}</h3>
-            <p style={styles.cardDesc}>{item.desc}</p>
+          <div key={index} className="bg-white p-8 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 group">
+            <div className="w-14 h-14 bg-teal-50 rounded-xl flex items-center justify-center text-2xl mb-6 text-[var(--primary-color)] group-hover:bg-teal-100 transition-colors">
+              {item.icon}
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-3">{item.title}</h3>
+            <p className="text-gray-600 leading-relaxed text-sm">{item.desc}</p>
           </div>
         ))}
       </div>
     </section>
   );
-};
-
-const styles: { [key: string]: React.CSSProperties } = {
-  section: {
-    padding: '60px 20px',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '50px',
-  },
-  heading: {
-    fontSize: '32px',
-    color: 'var(--primary-color)',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-  },
-  subHeading: {
-    color: '#666',
-    fontSize: '16px',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '30px',
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: '30px',
-    borderRadius: '16px',
-    boxShadow: '0 5px 20px rgba(0,0,0,0.05)',
-    transition: 'transform 0.3s',
-    textAlign: 'left',
-  },
-  iconBox: {
-    width: '50px',
-    height: '50px',
-    backgroundColor: '#E8F5F3',
-    borderRadius: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '24px',
-    marginBottom: '20px',
-    color: 'var(--primary-color)',
-  },
-  cardTitle: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-    color: '#333',
-  },
-  cardDesc: {
-    color: '#666',
-    lineHeight: '1.5',
-    fontSize: '14px',
-  }
 };
 
 export default Features;

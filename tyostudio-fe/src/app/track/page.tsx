@@ -1,6 +1,4 @@
 import React from 'react';
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
 import TrackerDashboard from '../../components/TrackerDashboard';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
@@ -29,8 +27,6 @@ export default async function TrackPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans pb-20">
-      <Navbar />
-
       <main className="container mx-auto px-4 py-8">
 
         {/* --- HEADER PROFILE --- */}
@@ -61,7 +57,6 @@ export default async function TrackPage() {
         />
 
       </main>
-      <Footer />
     </div>
   );
 }

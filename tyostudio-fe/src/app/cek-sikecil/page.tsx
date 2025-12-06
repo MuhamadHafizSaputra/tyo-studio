@@ -1,6 +1,3 @@
-import React from 'react';
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
 import StuntingForm from '../../components/StuntingForm';
 import { createClient } from '@/utils/supabase/server';
 
@@ -42,8 +39,6 @@ export default async function CheckStuntingPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans">
-      <Navbar />
-
       <main className="container mx-auto px-4 py-8">
 
         {/* Toggle Login Simulation Removed - Handled by Auth State */}
@@ -56,7 +51,6 @@ export default async function CheckStuntingPage() {
         />
 
       </main>
-      <Footer />
     </div>
   );
 }
