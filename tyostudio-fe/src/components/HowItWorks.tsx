@@ -1,5 +1,3 @@
-import React from 'react';
-
 const HowItWorks: React.FC = () => {
   const steps = [
     { num: '01', title: 'Input Data', desc: 'Masukkan usia, berat, dan tinggi badan anak ke dalam sistem.' },
@@ -8,76 +6,28 @@ const HowItWorks: React.FC = () => {
   ];
 
   return (
-    <section style={styles.section}>
-      <div className="container" style={styles.container}>
-        <h2 style={styles.heading}>Cara Kerja Aplikasi</h2>
-        <div style={styles.stepsWrapper}>
+    <section className="py-20 bg-white">
+      <div className="container mx-auto px-5 text-center max-w-6xl">
+        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-16">Cara Kerja Aplikasi</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           {steps.map((step, idx) => (
-            <div key={idx} style={styles.stepCard}>
-              <div style={styles.number}>{step.num}</div>
-              <h3 style={styles.stepTitle}>{step.title}</h3>
-              <p style={styles.stepDesc}>{step.desc}</p>
+            <div key={idx} className="relative p-6 group">
+              {/* Giant Number Background */}
+              <div className="absolute -top-6 left-1/2 min-w-[3ch] -translate-x-1/2 text-8xl font-black text-[var(--secondary-color)]/10 select-none z-0 transition-transform group-hover:scale-110 duration-500">
+                {step.num}
+              </div>
+
+              <div className="relative z-10 pt-8">
+                <h3 className="text-xl font-bold text-[var(--primary-color)] mb-4">{step.title}</h3>
+                <p className="text-gray-600 leading-relaxed max-w-xs mx-auto">{step.desc}</p>
+              </div>
             </div>
           ))}
         </div>
       </div>
     </section>
   );
-};
-
-const styles: { [key: string]: React.CSSProperties } = {
-  section: {
-    padding: '80px 0',
-    backgroundColor: '#fff', 
-  },
-  container: {
-    textAlign: 'center',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-  },
-  heading: {
-    fontSize: '32px',
-    color: '#333',
-    fontWeight: 'bold',
-    marginBottom: '60px',
-  },
-  stepsWrapper: {
-    display: 'flex',
-    justifyContent: 'space-around',
-    flexWrap: 'wrap',
-    gap: '30px',
-  },
-  stepCard: {
-    flex: 1,
-    minWidth: '250px',
-    position: 'relative',
-    padding: '20px',
-  },
-  number: {
-    fontSize: '60px',
-    fontWeight: '900',
-    color: 'var(--secondary-color)', 
-    opacity: 0.2,
-    position: 'absolute',
-    top: -20,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 1,
-  },
-  stepTitle: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-    position: 'relative',
-    zIndex: 2,
-    color: 'var(--primary-color)',
-  },
-  stepDesc: {
-    color: '#666',
-    position: 'relative',
-    zIndex: 2,
-  }
 };
 
 export default HowItWorks;

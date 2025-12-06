@@ -16,42 +16,37 @@ function LandingPage() {
   ];
 
   return (
-    <div className="app">
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      
-      <main>
+
+      <main className="flex-grow">
         <Hero />
-        
-        {/* Section 1: Fitur Utama (Menjelaskan 4 poin utama aplikasi) */}
+
+        {/* Section 1: Fitur Utama */}
         <Features />
 
-        {/* Section 2: Preview Output (Visualisasi Grafik BMI/Stunting) */}
-        {/* Kita beri background putih agar kontras dengan section Features */}
-        <div style={{ backgroundColor: '#fff' }}>
+        {/* Section 2: Preview Output */}
+        <div className="bg-white">
           <BiometricSection />
         </div>
 
-        {/* Section 3: Saran Nutrisi (Implementasi fitur saran makanan) */}
-        <section className="container" style={{ padding: '80px 20px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h2 style={{ fontSize: '32px', color: 'var(--primary-color)', fontWeight: 'bold' }}>
+        {/* Section 3: Saran Nutrisi */}
+        <section className="container mx-auto px-5 py-20">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-[var(--primary-color)] mb-4">
               Rekomendasi Menu Harian
             </h2>
-            <p style={{ color: '#666', marginTop: '10px' }}>
+            <p className="text-gray-600 max-w-2xl mx-auto">
               Contoh saran makanan berdasarkan hasil perhitungan kebutuhan kalori anak.
             </p>
           </div>
-          
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-            gap: '30px' 
-          }}>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {recommendedMeals.map((item) => (
-              <FoodCard 
-                key={item.id} 
-                name={item.name} 
-                imageSrc={item.image} 
+              <FoodCard
+                key={item.id}
+                name={item.name}
+                imageSrc={item.image}
               />
             ))}
           </div>
@@ -61,30 +56,16 @@ function LandingPage() {
         <HowItWorks />
 
         {/* Section 5: CTA (Call to Action) */}
-        <section style={{ 
-          backgroundColor: 'var(--primary-color)', 
-          padding: '60px 20px', 
-          textAlign: 'center',
-          color: 'white',
-          borderRadius: '20px',
-          margin: '40px 20px'
-        }}>
-          <h2 style={{ margin: '0 0 20px 0', fontSize: '28px' }}>Siap Memantau Tumbuh Kembang Anak?</h2>
-          <p style={{ marginBottom: '30px', opacity: 0.9 }}>
-            Daftar sekarang dan dapatkan akses ke kalkulator stunting serta jurnal nutrisi harian.
-          </p>
-          <button style={{
-            backgroundColor: 'var(--secondary-color)',
-            color: 'white',
-            border: 'none',
-            padding: '12px 35px',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            borderRadius: '50px',
-            cursor: 'pointer'
-          }}>
-            Mulai Gratis
-          </button>
+        <section className="container mx-auto px-5">
+          <div className="bg-[var(--primary-color)] text-white text-center py-16 px-6 rounded-3xl mx-auto max-w-5xl shadow-2xl shadow-teal-200">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">Siap Memantau Tumbuh Kembang Anak?</h2>
+            <p className="text-lg opacity-90 mb-10 max-w-2xl mx-auto">
+              Daftar sekarang dan dapatkan akses ke kalkulator stunting serta jurnal nutrisi harian.
+            </p>
+            <button className="bg-[var(--secondary-color)] text-white border-0 px-10 py-4 text-lg font-bold rounded-full cursor-pointer hover:bg-rose-500 hover:scale-105 transition-all duration-300 shadow-lg shadow-rose-400/30">
+              Mulai Gratis
+            </button>
+          </div>
         </section>
       </main>
 
