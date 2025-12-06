@@ -1,67 +1,44 @@
 import React from 'react';
+import Link from 'next/link';
+import { createClient } from '../utils/supabase/server';
+import NavUserMenu from './NavUserMenu';
 
-const Navbar: React.FC = () => {
+const Navbar = async () => {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   return (
-    <nav style={styles.nav}>
-      <div className="container" style={styles.container}>
-        {/* Logo Placeholder */}
-        <div style={styles.logo}>Logo</div>
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        {/* Logo */}
+        <Link href="/" className="text-2xl font-bold text-[var(--primary-color)]">
+          TyoStudio
+        </Link>
 
         {/* Menu Links */}
-        <ul style={styles.menu}>
-          {['Home', 'Artikel', 'Check IMT', 'About Us'].map((item) => (
-            <li key={item} style={styles.menuItem}>
-              <a href={`#${item.toLowerCase().replace(' ', '-')}`} style={styles.link}>
-                {item}
-              </a>
+        <ul className="hidden md:flex list-none gap-8 m-0 p-0">
+          {[
+            { name: 'Home', path: '/' },
+            { name: 'Cek Si Kecil', path: '/cek-sikecil' },
+            { name: 'Cek Nutrisi', path: '/cek-nutrisi' },
+            { name: 'Track Si Kecil', path: '/track' },
+          ].map((item) => (
+            <li key={item.name}>
+              <Link
+                href={item.path}
+                className="text-gray-600 hover:text-[var(--primary-color)] font-medium transition-colors"
+              >
+                {item.name}
+              </Link>
             </li>
           ))}
         </ul>
 
-        {/* Login Button */}
-        <button style={styles.loginBtn}>Login</button>
+        {/* Login/User Menu */}
+        <NavUserMenu user={user} />
       </div>
     </nav>
   );
-};
-
-const styles: { [key: string]: React.CSSProperties } = {
-  nav: {
-    padding: '20px 0',
-    backgroundColor: 'transparent',
-  },
-  container: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    backgroundColor: '#ccc',
-    padding: '5px 15px',
-    fontWeight: 'bold',
-    borderRadius: '4px',
-  },
-  menu: {
-    display: 'flex',
-    listStyle: 'none',
-    gap: '30px',
-    padding: 0,
-    margin: 0,
-  },
-  menuItem: {},
-  link: {
-    textDecoration: 'none',
-    color: '#555',
-    fontWeight: 500,
-    fontSize: '14px',
-  },
-  loginBtn: {
-    backgroundColor: 'var(--primary-color)',
-    color: 'white',
-    padding: '8px 24px',
-    borderRadius: '6px',
-    fontSize: '14px',
-  },
 };
 
 export default Navbar;
