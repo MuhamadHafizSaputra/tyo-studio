@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 
 // Tipe data untuk Log Makanan
 interface FoodLog {
@@ -62,11 +62,11 @@ const CalculatorIMT: React.FC = () => {
     const ageMonth = parseFloat(childData.age);
     const ageYear = ageMonth / 12;
     const idealHeightMin = (ageYear * 5) + 75; // Contoh ambang batas bawah kasar
-    
+
     let stuntingLabel = 'Normal (Tumbuh Baik)';
     if (height < idealHeightMin * 0.9) {
-        stuntingLabel = 'Berisiko Stunting';
-        adviceText += ' Perhatian: Tinggi badan anak di bawah rata-rata seusianya. Konsultasikan dengan dokter anak dan fokus pada asupan Zinc & Kalsium.';
+      stuntingLabel = 'Berisiko Stunting';
+      adviceText += ' Perhatian: Tinggi badan anak di bawah rata-rata seusianya. Konsultasikan dengan dokter anak dan fokus pada asupan Zinc & Kalsium.';
     }
 
     setResult({
@@ -105,55 +105,55 @@ const CalculatorIMT: React.FC = () => {
             <form onSubmit={calculateHealth} style={styles.form}>
               <div style={styles.formGroup}>
                 <label>Nama Anak</label>
-                <input 
-                  type="text" 
-                  style={styles.input} 
+                <input
+                  type="text"
+                  style={styles.input}
                   value={childData.name}
-                  onChange={(e) => setChildData({...childData, name: e.target.value})}
+                  onChange={(e) => setChildData({ ...childData, name: e.target.value })}
                   placeholder="Contoh: Budi"
                 />
               </div>
               <div style={styles.row}>
                 <div style={styles.formGroup}>
                   <label>Usia (Bulan)</label>
-                  <input 
-                    type="number" 
-                    style={styles.input} 
+                  <input
+                    type="number"
+                    style={styles.input}
                     value={childData.age}
-                    onChange={(e) => setChildData({...childData, age: e.target.value})}
+                    onChange={(e) => setChildData({ ...childData, age: e.target.value })}
                     placeholder="12"
                   />
                 </div>
                 <div style={styles.formGroup}>
-                    <label>Jenis Kelamin</label>
-                    <select 
-                        style={styles.input}
-                        value={childData.gender}
-                        onChange={(e) => setChildData({...childData, gender: e.target.value})}
-                    >
-                        <option value="male">Laki-laki</option>
-                        <option value="female">Perempuan</option>
-                    </select>
+                  <label>Jenis Kelamin</label>
+                  <select
+                    style={styles.input}
+                    value={childData.gender}
+                    onChange={(e) => setChildData({ ...childData, gender: e.target.value })}
+                  >
+                    <option value="male">Laki-laki</option>
+                    <option value="female">Perempuan</option>
+                  </select>
                 </div>
               </div>
               <div style={styles.row}>
                 <div style={styles.formGroup}>
                   <label>Berat (kg)</label>
-                  <input 
-                    type="number" 
-                    style={styles.input} 
+                  <input
+                    type="number"
+                    style={styles.input}
                     value={childData.weight}
-                    onChange={(e) => setChildData({...childData, weight: e.target.value})}
+                    onChange={(e) => setChildData({ ...childData, weight: e.target.value })}
                     placeholder="10.5"
                   />
                 </div>
                 <div style={styles.formGroup}>
                   <label>Tinggi (cm)</label>
-                  <input 
-                    type="number" 
-                    style={styles.input} 
+                  <input
+                    type="number"
+                    style={styles.input}
                     value={childData.height}
-                    onChange={(e) => setChildData({...childData, height: e.target.value})}
+                    onChange={(e) => setChildData({ ...childData, height: e.target.value })}
                     placeholder="85"
                   />
                 </div>
@@ -168,38 +168,39 @@ const CalculatorIMT: React.FC = () => {
             {result ? (
               <div style={styles.resultBox}>
                 <div style={styles.scoreRow}>
-                    <div style={styles.scoreItem}>
-                        <span style={styles.label}>IMT / BMI</span>
-                        <span style={styles.bigValue}>{result.bmi}</span>
-                    </div>
-                    <div style={styles.scoreItem}>
-                        <span style={styles.label}>Status Berat</span>
-                        <span style={{...styles.badge, 
-                            backgroundColor: result.status.includes('Normal') ? '#E8F5F3' : '#FFEEEE',
-                            color: result.status.includes('Normal') ? '#267765' : '#D9534F'
-                        }}>
-                            {result.status}
-                        </span>
-                    </div>
-                </div>
-                
-                <div style={{marginTop: '20px'}}>
-                    <span style={styles.label}>Prediksi Tinggi (Stunting)</span>
-                    <div style={{
-                        padding: '10px', 
-                        backgroundColor: result.stuntingStatus.includes('Normal') ? '#E8F5F3' : '#FFF4E5',
-                        color: result.stuntingStatus.includes('Normal') ? '#267765' : '#FF8C00',
-                        fontWeight: 'bold',
-                        borderRadius: '8px',
-                        marginTop: '5px'
+                  <div style={styles.scoreItem}>
+                    <span style={styles.label}>IMT / BMI</span>
+                    <span style={styles.bigValue}>{result.bmi}</span>
+                  </div>
+                  <div style={styles.scoreItem}>
+                    <span style={styles.label}>Status Berat</span>
+                    <span style={{
+                      ...styles.badge,
+                      backgroundColor: result.status.includes('Normal') ? '#E8F5F3' : '#FFEEEE',
+                      color: result.status.includes('Normal') ? '#267765' : '#D9534F'
                     }}>
-                        {result.stuntingStatus}
-                    </div>
+                      {result.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '20px' }}>
+                  <span style={styles.label}>Prediksi Tinggi (Stunting)</span>
+                  <div style={{
+                    padding: '10px',
+                    backgroundColor: result.stuntingStatus.includes('Normal') ? '#E8F5F3' : '#FFF4E5',
+                    color: result.stuntingStatus.includes('Normal') ? '#267765' : '#FF8C00',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    marginTop: '5px'
+                  }}>
+                    {result.stuntingStatus}
+                  </div>
                 </div>
 
                 <div style={styles.adviceBox}>
-                    <strong>💡 Saran Nutrisi:</strong>
-                    <p style={{marginTop: '5px', lineHeight: '1.5'}}>{result.advice}</p>
+                  <strong>💡 Saran Nutrisi:</strong>
+                  <p style={{ marginTop: '5px', lineHeight: '1.5' }}>{result.advice}</p>
                 </div>
               </div>
             ) : (
@@ -211,52 +212,52 @@ const CalculatorIMT: React.FC = () => {
         </div>
 
         {/* SECTION BAWAH: JURNAL MAKANAN */}
-        <div style={{...styles.card, marginTop: '30px'}}>
-            <h3 style={styles.cardTitle}>🥗 Jurnal Makanan & Nutrisi Harian</h3>
-            <div style={styles.foodContainer}>
-                {/* Input Makanan */}
-                <div style={styles.foodInputSection}>
-                    <input 
-                        type="text" 
-                        style={styles.input} 
-                        placeholder="Nama Makanan (misal: Bubur Ayam)"
-                        value={foodInput.name}
-                        onChange={(e) => setFoodInput({...foodInput, name: e.target.value})}
-                    />
-                    <input 
-                        type="number" 
-                        style={styles.input} 
-                        placeholder="Kalori (kkal)"
-                        value={foodInput.calories}
-                        onChange={(e) => setFoodInput({...foodInput, calories: e.target.value})}
-                    />
-                    <button onClick={handleAddFood} style={styles.buttonSecondary}>+ Tambah</button>
-                </div>
-
-                {/* List Makanan */}
-                <div style={styles.foodList}>
-                    {foodLogs.length === 0 && <p style={{color: '#888', fontStyle: 'italic'}}>Belum ada data makanan hari ini.</p>}
-                    
-                    {foodLogs.map((log) => (
-                        <div key={log.id} style={styles.foodItem}>
-                            <div>
-                                <strong>{log.name}</strong>
-                                <span style={{fontSize: '12px', color: '#666', marginLeft: '10px'}}>Jam {log.time}</span>
-                            </div>
-                            <div style={{fontWeight: 'bold', color: 'var(--primary-color)'}}>
-                                {log.calories} kkal
-                            </div>
-                        </div>
-                    ))}
-                    
-                    {foodLogs.length > 0 && (
-                        <div style={styles.totalRow}>
-                            <span>Total Kalori Hari Ini:</span>
-                            <span>{foodLogs.reduce((acc, curr) => acc + curr.calories, 0)} kkal</span>
-                        </div>
-                    )}
-                </div>
+        <div style={{ ...styles.card, marginTop: '30px' }}>
+          <h3 style={styles.cardTitle}>🥗 Jurnal Makanan & Nutrisi Harian</h3>
+          <div style={styles.foodContainer}>
+            {/* Input Makanan */}
+            <div style={styles.foodInputSection}>
+              <input
+                type="text"
+                style={styles.input}
+                placeholder="Nama Makanan (misal: Bubur Ayam)"
+                value={foodInput.name}
+                onChange={(e) => setFoodInput({ ...foodInput, name: e.target.value })}
+              />
+              <input
+                type="number"
+                style={styles.input}
+                placeholder="Kalori (kkal)"
+                value={foodInput.calories}
+                onChange={(e) => setFoodInput({ ...foodInput, calories: e.target.value })}
+              />
+              <button onClick={handleAddFood} style={styles.buttonSecondary}>+ Tambah</button>
             </div>
+
+            {/* List Makanan */}
+            <div style={styles.foodList}>
+              {foodLogs.length === 0 && <p style={{ color: '#888', fontStyle: 'italic' }}>Belum ada data makanan hari ini.</p>}
+
+              {foodLogs.map((log) => (
+                <div key={log.id} style={styles.foodItem}>
+                  <div>
+                    <strong>{log.name}</strong>
+                    <span style={{ fontSize: '12px', color: '#666', marginLeft: '10px' }}>Jam {log.time}</span>
+                  </div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                    {log.calories} kkal
+                  </div>
+                </div>
+              ))}
+
+              {foodLogs.length > 0 && (
+                <div style={styles.totalRow}>
+                  <span>Total Kalori Hari Ini:</span>
+                  <span>{foodLogs.reduce((acc, curr) => acc + curr.calories, 0)} kkal</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
       </main>
@@ -341,7 +342,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   bigValue: { fontSize: '28px', fontWeight: '800', color: 'var(--primary-color)' },
   badge: { padding: '5px 12px', borderRadius: '50px', fontSize: '12px', fontWeight: 'bold' },
   adviceBox: { marginTop: '20px', padding: '15px', backgroundColor: '#FFF8F0', borderRadius: '8px', borderLeft: '4px solid var(--secondary-color)', fontSize: '14px' },
-  
+
   // Styles for Food Log
   foodContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
   foodInputSection: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
