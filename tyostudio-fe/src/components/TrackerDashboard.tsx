@@ -5,10 +5,12 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
 import { useRouter } from 'next/navigation';
+import ChildSelector from './ChildSelector';
 
 interface TrackerDashboardProps {
   user: any;
   child: any;
+  allChildren?: any[];
   growthRecords: any[];
 }
 
@@ -76,9 +78,16 @@ const CustomTooltip = ({ active, payload, label, mode }: any) => {
   return null;
 };
 
-export default function TrackerDashboard({ user, child, growthRecords }: TrackerDashboardProps) {
+export default function TrackerDashboard({ user, child, allChildren, growthRecords }: TrackerDashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'height' | 'weight' | 'zscore'>('height');
+
+  // Handle Child Switch
+  const handleChildSelect = (childId: string) => {
+    // Navigate to same page but with new childId query param
+    // This triggers SSR re-fetch in page.tsx
+    router.push(`/track?childId=${childId}`);
+  };
 
   // Merge Standard Data with User Data
   const chartData = useMemo(() => {
@@ -93,9 +102,6 @@ export default function TrackerDashboard({ user, child, growthRecords }: Tracker
       ).month;
 
       // If exact match or close enough, user data overrides
-      // Assuming user enters data freely, we might have multiple points.
-      // For line chart 'categorical', we need to match keys.
-      // Let's create a copy of standardData and fill in 'child' values
       recordsMap.set(bucket, r);
     });
 
@@ -125,187 +131,238 @@ export default function TrackerDashboard({ user, child, growthRecords }: Tracker
   // Latest Record for Summary
   const currentStatus = chartData.findLast(d => d.heightChild !== null) || chartData[0];
 
+  // History Logs (Reverse Chronological) - Get last 5
+  // growthRecords is ascending, so we simply reverse copy
+  const historyLogs = [...growthRecords].reverse().slice(0, 5);
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="flex flex-col gap-6">
 
-      {/* --- AREA GRAFIK (KIRI) --- */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-
-          {/* Header Grafik & Tab Switcher */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-            <div>
-              <h3 className="font-bold text-xl text-gray-800">Grafik Pertumbuhan</h3>
-              <p className="text-xs text-gray-400 mt-1">
-                {child ? `Data untuk ${child.name}` : 'Belum ada data anak'}
-              </p>
+      {/* --- HEADER PROFILE & SELECTOR --- */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-3xl shadow-sm">👶</div>
+          <div>
+            <h2 className="font-bold text-gray-800 text-2xl">{child?.name || 'Si Kecil'}</h2>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase tracking-wide">{child?.gender || '-'}</span>
+              {child?.date_of_birth && (
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  🎂 {new Date(child.date_of_birth).toLocaleDateString()}
+                </span>
+              )}
             </div>
-
-            {/* Tab Switcher */}
-            <div className="flex bg-gray-50 p-1.5 rounded-xl border border-gray-100">
-              {['height', 'weight', 'zscore'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab as any)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 capitalize ${activeTab === tab
-                      ? 'bg-white text-[var(--primary-color)] shadow-sm scale-105'
-                      : 'text-gray-400 hover:text-gray-600'
-                    }`}
-                >
-                  {tab === 'zscore' ? 'Z-Score' : tab === 'height' ? 'Tinggi' : 'Berat'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Chart Container */}
-          <div className="h-[380px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis
-                  dataKey="age"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#9CA3AF', fontSize: 12, fontWeight: 500 }}
-                  dy={15}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip cursor={{ stroke: '#E5E7EB', strokeWidth: 2 }} content={<CustomTooltip mode={activeTab} />} />
-
-                {/* --- KONFIGURASI GARIS SESUAI GAMBAR REFERENSI --- */}
-
-                {/* MODE TINGGI BADAN */}
-                {activeTab === 'height' && (
-                  <>
-                    <Line type="monotone" dataKey="heightIdeal" stroke="#10B981" strokeWidth={2.5}
-                      dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }} name="Ideal" />
-
-                    <Line type="monotone" dataKey="heightChild" stroke="#3B82F6" strokeWidth={3} connectNulls
-                      dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} name="Anak" />
-
-                    <Line type="monotone" dataKey="heightBorder" stroke="#F87171" strokeDasharray="6 6" strokeWidth={2}
-                      dot={{ r: 4, fill: '#F87171', strokeWidth: 2, stroke: '#fff' }} name="Batas" />
-                  </>
-                )}
-
-                {/* MODE BERAT BADAN */}
-                {activeTab === 'weight' && (
-                  <>
-                    <Line type="monotone" dataKey="weightIdeal" stroke="#10B981" strokeWidth={2.5}
-                      dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }} />
-                    <Line type="monotone" dataKey="weightChild" stroke="#3B82F6" strokeWidth={3} connectNulls
-                      dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} />
-                    <Line type="monotone" dataKey="weightBorder" stroke="#F87171" strokeDasharray="6 6" strokeWidth={2}
-                      dot={{ r: 4, fill: '#F87171', strokeWidth: 2, stroke: '#fff' }} />
-                  </>
-                )}
-
-                {/* MODE Z-SCORE */}
-                {activeTab === 'zscore' && (
-                  <>
-                    <ReferenceLine y={0} stroke="#10B981" strokeDasharray="3 3" label={{ position: 'right', value: 'Median', fill: '#10B981', fontSize: 10 }} />
-                    <ReferenceLine y={-2} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'right', value: '-2 SD', fill: '#EF4444', fontSize: 10 }} />
-
-                    <Line type="monotone" dataKey="zScore" stroke="#3B82F6" strokeWidth={3} connectNulls
-                      dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} />
-                  </>
-                )}
-
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Legend Manual yang Clean */}
-          <div className="flex justify-center gap-6 mt-8">
-            {activeTab !== 'zscore' ? (
-              <>
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-                  <span className="w-3 h-3 rounded-full bg-[#10B981] border-2 border-white shadow-sm ring-1 ring-[#10B981]/20"></span>
-                  Ideal
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-                  <span className="w-3 h-3 rounded-full bg-[#3B82F6] border-2 border-white shadow-sm ring-1 ring-[#3B82F6]/20"></span>
-                  Si Kecil
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-                  <span className="w-3 h-3 rounded-full bg-[#F87171] border-2 border-white shadow-sm ring-1 ring-[#F87171]/20"></span>
-                  Batas Stunting
-                </div>
-              </>
-            ) : (
-              <p className="text-xs text-gray-400">Garis referensi hijau adalah Median (0), merah adalah ambang batas (-2 SD)</p>
-            )}
           </div>
         </div>
 
-        {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
-          <span className="text-xl">💡</span>
-          <p className="text-sm text-blue-800 leading-relaxed">
-            <strong>Tips:</strong> Klik tab di atas grafik untuk beralih antara melihat tren Berat Badan, Tinggi Badan, atau skor standar deviasi (Z-Score) secara detail.
-          </p>
+        {/* Selector */}
+        <div className="w-full md:w-64">
+          {allChildren && (
+            <ChildSelector
+              childrenData={allChildren}
+              selectedId={child?.id}
+              onSelect={handleChildSelect}
+              label="Lihat Data Anak:"
+            />
+          )}
         </div>
       </div>
 
-      {/* --- AREA KANAN (MENU & LOG) --- */}
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Kartu Menu */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50">
-            🍽️ Menu Rekomendasi
-          </h3>
-          <div className="space-y-4">
-            <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-              <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                🐟
-              </div>
+        {/* --- AREA GRAFIK (KIRI) --- */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+
+            {/* Header Grafik & Tab Switcher */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
               <div>
-                <h4 className="font-bold text-gray-800 text-sm">Ikan Kembung Kuah Asam</h4>
-                <p className="text-xs text-gray-500 mt-1">Mengandung Omega-3 tinggi untuk perkembangan otak & protein.</p>
+                <h3 className="font-bold text-xl text-gray-800">Grafik Pertumbuhan</h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  Membandingkan dengan standar WHO
+                </p>
+              </div>
+
+              {/* Tab Switcher */}
+              <div className="flex bg-gray-50 p-1.5 rounded-xl border border-gray-100">
+                {['height', 'weight', 'zscore'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab as any)}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 capitalize ${activeTab === tab
+                      ? 'bg-white text-[var(--primary-color)] shadow-sm scale-105'
+                      : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                  >
+                    {tab === 'zscore' ? 'Z-Score' : tab === 'height' ? 'Tinggi' : 'Berat'}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-              <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                🥛
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-800 text-sm">Susu Tinggi Kalori</h4>
-                <p className="text-xs text-gray-500 mt-1">Tambahan 2 gelas sehari untuk mengejar berat badan.</p>
-              </div>
+
+            {/* Chart Container */}
+            <div className="h-[380px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis
+                    dataKey="age"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#9CA3AF', fontSize: 12, fontWeight: 500 }}
+                    dy={15}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip cursor={{ stroke: '#E5E7EB', strokeWidth: 2 }} content={<CustomTooltip mode={activeTab} />} />
+
+                  {/* --- KONFIGURASI GARIS SESUAI GAMBAR REFERENSI --- */}
+
+                  {/* MODE TINGGI BADAN */}
+                  {activeTab === 'height' && (
+                    <>
+                      <Line type="monotone" dataKey="heightIdeal" stroke="#10B981" strokeWidth={2.5}
+                        dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }} name="Ideal" />
+
+                      <Line type="monotone" dataKey="heightChild" stroke="#3B82F6" strokeWidth={3} connectNulls
+                        dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} name="Anak" />
+
+                      <Line type="monotone" dataKey="heightBorder" stroke="#F87171" strokeDasharray="6 6" strokeWidth={2}
+                        dot={{ r: 4, fill: '#F87171', strokeWidth: 2, stroke: '#fff' }} name="Batas" />
+                    </>
+                  )}
+
+                  {/* MODE BERAT BADAN */}
+                  {activeTab === 'weight' && (
+                    <>
+                      <Line type="monotone" dataKey="weightIdeal" stroke="#10B981" strokeWidth={2.5}
+                        dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }} />
+                      <Line type="monotone" dataKey="weightChild" stroke="#3B82F6" strokeWidth={3} connectNulls
+                        dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} />
+                      <Line type="monotone" dataKey="weightBorder" stroke="#F87171" strokeDasharray="6 6" strokeWidth={2}
+                        dot={{ r: 4, fill: '#F87171', strokeWidth: 2, stroke: '#fff' }} />
+                    </>
+                  )}
+
+                  {/* MODE Z-SCORE */}
+                  {activeTab === 'zscore' && (
+                    <>
+                      <ReferenceLine y={0} stroke="#10B981" strokeDasharray="3 3" label={{ position: 'right', value: 'Median', fill: '#10B981', fontSize: 10 }} />
+                      <ReferenceLine y={-2} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'right', value: '-2 SD', fill: '#EF4444', fontSize: 10 }} />
+
+                      <Line type="monotone" dataKey="zScore" stroke="#3B82F6" strokeWidth={3} connectNulls
+                        dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} />
+                    </>
+                  )}
+
+                </LineChart>
+              </ResponsiveContainer>
             </div>
+
+            {/* Legend Manual yang Clean */}
+            <div className="flex justify-center gap-6 mt-8">
+              {activeTab !== 'zscore' ? (
+                <>
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
+                    <span className="w-3 h-3 rounded-full bg-[#10B981] border-2 border-white shadow-sm ring-1 ring-[#10B981]/20"></span>
+                    Ideal
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
+                    <span className="w-3 h-3 rounded-full bg-[#3B82F6] border-2 border-white shadow-sm ring-1 ring-[#3B82F6]/20"></span>
+                    Si Kecil
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
+                    <span className="w-3 h-3 rounded-full bg-[#F87171] border-2 border-white shadow-sm ring-1 ring-[#F87171]/20"></span>
+                    Batas Stunting
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-gray-400">Garis referensi hijau adalah Median (0), merah adalah ambang batas (-2 SD)</p>
+              )}
+            </div>
+          </div>
+
+          {/* Info Box */}
+          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
+            <span className="text-xl">💡</span>
+            <p className="text-sm text-blue-800 leading-relaxed">
+              <strong>Tips:</strong> Klik tab di atas grafik untuk beralih antara melihat tren Berat Badan, Tinggi Badan, atau skor standar deviasi (Z-Score) secara detail.
+            </p>
           </div>
         </div>
 
-        {/* Riwayat Singkat */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50">
-            📏 Riwayat Terakhir
-          </h3>
-          {currentStatus && currentStatus.heightChild ? (
-            <div className="relative pl-6 border-l-2 border-dashed border-gray-200 space-y-6">
-              <div className="relative">
-                <div className={`absolute -left-[31px] top-1 w-4 h-4 rounded-full border-4 border-white shadow-sm ${currentStatus.zScore && currentStatus.zScore < -2 ? 'bg-red-500' : 'bg-emerald-400'}`}></div>
+        {/* --- AREA KANAN (MENU & LOG) --- */}
+        <div className="space-y-6">
+
+          {/* Kartu Menu */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50">
+              🍽️ Menu Rekomendasi
+            </h3>
+            <div className="space-y-4">
+              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
+                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
+                  🐟
+                </div>
                 <div>
-                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">{currentStatus.age}</p>
-                  <p className="font-bold text-gray-800">T: {currentStatus.heightChild} cm | B: {currentStatus.weightChild} kg</p>
-                  <span className={`inline-block mt-1 px-2 py-0.5 text-[10px] font-bold rounded ${currentStatus.zScore && currentStatus.zScore < -2 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                    {currentStatus.zScore && currentStatus.zScore < -2 ? 'Risk Stunting' : 'Normal'}
-                  </span>
+                  <h4 className="font-bold text-gray-800 text-sm">Ikan Kembung Kuah Asam</h4>
+                  <p className="text-xs text-gray-500 mt-1">Mengandung Omega-3 tinggi untuk perkembangan otak & protein.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
+                <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
+                  🥛
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-800 text-sm">Susu Tinggi Kalori</h4>
+                  <p className="text-xs text-gray-500 mt-1">Tambahan 2 gelas sehari untuk mengejar berat badan.</p>
                 </div>
               </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-400 italic">Belum ada data riwayat.</p>
-          )}
-        </div>
+          </div>
 
+          {/* Riwayat (Log Updates) */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50">
+              📋 Riwayat Update
+            </h3>
+
+            {historyLogs && historyLogs.length > 0 ? (
+              <div className="relative border-l-2 border-gray-100 ml-3 space-y-6 py-2">
+                {historyLogs.map((log, idx) => (
+                  <div key={idx} className="relative pl-6">
+                    {/* Dot Indicator (Top one is distinct) */}
+                    <div className={`absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-[var(--primary-color)] scale-125 ring-2 ring-teal-100' : 'bg-gray-300'}`}></div>
+
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 mb-0.5">
+                        {log.recorded_date ? new Date(log.recorded_date).toLocaleDateString() : 'Baru saja'}
+                        <span className="mx-1">•</span>
+                        {log.age_in_months} Bulan
+                      </p>
+                      <div className="font-medium text-gray-800 text-sm">
+                        Tinggi: <strong>{log.height}</strong> cm, Berat: <strong>{log.weight}</strong> kg
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {growthRecords.length > 5 && (
+                  <div className="pl-6 text-xs text-gray-400 italic">
+                    ... dan {growthRecords.length - 5} data lainnya.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic text-center py-4">Belum ada riwayat update data.</p>
+            )}
+
+          </div>
+
+        </div>
       </div>
     </div>
   );

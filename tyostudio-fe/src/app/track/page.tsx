@@ -3,7 +3,11 @@ import TrackerDashboard from '../../components/TrackerDashboard';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 
-export default async function TrackPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function TrackPage({ searchParams }: { searchParams: Promise<{ childId?: string }> }) {
+  const resolvedParams = await searchParams; // Await the promise
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -11,9 +15,19 @@ export default async function TrackPage() {
     redirect('/login');
   }
 
-  // Fetch Child
+  // Fetch All Children for Selector
   const { data: children } = await supabase.from('children').select('*').eq('user_id', user.id);
-  const selectedChild = children && children.length > 0 ? children[0] : null;
+  const allChildren = children || [];
+
+  // Determine Selected Child
+  // 1. If param exists, try to find it.
+  // 2. Else default to first child.
+  let selectedChild = null;
+  if (resolvedParams.childId) {
+    selectedChild = allChildren.find(c => c.id === resolvedParams.childId) || allChildren[0] || null;
+  } else {
+    selectedChild = allChildren[0] || null;
+  }
 
   let growthRecords: any[] = [];
   if (selectedChild) {
@@ -21,7 +35,7 @@ export default async function TrackPage() {
       .from('growth_records')
       .select('*')
       .eq('child_id', selectedChild.id)
-      .order('age_in_months', { ascending: true });
+      .order('age_in_months', { ascending: true }); // We want ascending for chart
     growthRecords = records || [];
   }
 
@@ -29,30 +43,12 @@ export default async function TrackPage() {
     <div className="min-h-screen bg-[#F8F9FA] font-sans pb-20">
       <main className="container mx-auto px-4 py-8">
 
-        {/* --- HEADER PROFILE --- */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-3xl shadow-sm">👶</div>
-            <div>
-              <h2 className="font-bold text-gray-800 text-xl">{selectedChild?.name || 'Si Kecil'}</h2>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{selectedChild?.gender || '-'}</span>
-                {selectedChild?.date_of_birth && (
-                  <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                    Lahir: {new Date(selectedChild.date_of_birth).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Ringkasan Status Terkini */}
-          {/* Can be consolidated in Dashboard or kept here if we want SSR header and client chart */}
-        </div>
+        {/* --- HEADER PROFILE: REMOVED (Moved inside Dashboard for cleaner switching) --- */}
 
         <TrackerDashboard
           user={user}
           child={selectedChild}
+          allChildren={allChildren}
           growthRecords={growthRecords}
         />
 
