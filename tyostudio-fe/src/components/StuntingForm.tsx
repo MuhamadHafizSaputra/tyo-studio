@@ -3,20 +3,25 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import ChildSelector from './ChildSelector';
 
 interface StuntingFormProps {
   user: any;
-  childrenData: any[];
-  latestGrowthRecord: any;
+  childrenData: any[]; // All children
+  latestGrowthRecord: any; // Initial record (optional/deprecated if we fetch client side on change)
   recommendations: any[];
 }
 
-export default function StuntingForm({ user, childrenData, latestGrowthRecord, recommendations }: StuntingFormProps) {
+export default function StuntingForm({ user, childrenData, latestGrowthRecord: initialRecord, recommendations }: StuntingFormProps) {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(!!user);
 
-  // Use the first child found for now
-  const selectedChild = childrenData?.[0];
+  // --- STATE ---
+  // Default to empty to allow manual input first
+  const [selectedChildId, setSelectedChildId] = useState<string>('');
+  const [currentGrowthRecord, setCurrentGrowthRecord] = useState<any>(initialRecord);
+
+  const selectedChild = childrenData?.find(c => c.id === selectedChildId);
 
   const [formData, setFormData] = useState({
     age: '',
@@ -32,8 +37,33 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord, r
     isStunting: boolean;
   } | null>(null);
 
+  // --- EFFECTS ---
+
+  // 1. Fetch latest record when selected child changes
   useEffect(() => {
-    if (user && selectedChild) {
+    const fetchLatestRecord = async () => {
+      if (!selectedChildId) return;
+
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('growth_records')
+        .select('*')
+        .eq('child_id', selectedChildId)
+        .order('recorded_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      setCurrentGrowthRecord(data || null);
+    };
+
+    if (selectedChildId) {
+      fetchLatestRecord();
+    }
+  }, [selectedChildId]);
+
+  // 2. Auto-fill form when child or record changes
+  useEffect(() => {
+    if (selectedChild) {
       // Calculate age in months if DOB exists
       let ageInMonths = '';
       if (selectedChild.date_of_birth) {
@@ -45,12 +75,17 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord, r
 
       setFormData({
         age: ageInMonths,
-        gender: selectedChild.gender,
-        weight: latestGrowthRecord?.weight?.toString() || selectedChild.birth_weight?.toString() || '',
-        height: latestGrowthRecord?.height?.toString() || selectedChild.birth_height?.toString() || '',
+        gender: selectedChild.gender || 'Laki-laki',
+        // Use latest record if available, else birth stats, else empty
+        weight: currentGrowthRecord?.weight?.toString() || selectedChild.birth_weight?.toString() || '',
+        height: currentGrowthRecord?.height?.toString() || selectedChild.birth_height?.toString() || '',
       });
+    } else {
+      // Reset if no child selected (e.g. user has no children)
+      setFormData({ age: '', gender: 'Laki-laki', weight: '', height: '' });
     }
-  }, [user, selectedChild, latestGrowthRecord]);
+  }, [selectedChild, currentGrowthRecord]);
+
 
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,12 +125,12 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord, r
     });
 
     // Save to Database if Child Exists
-    if (selectedChild) {
+    if (selectedChildId) {
       const supabase = createClient();
       console.log('Saving growth record...');
       const { error } = await supabase.from('growth_records').insert([
         {
-          child_id: selectedChild.id,
+          child_id: selectedChildId,
           age_in_months: age,
           height: height,
           weight: weight,
@@ -106,7 +141,16 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord, r
         console.error('Error saving growth record:', error);
       } else {
         console.log('Growth record saved');
-        router.refresh(); // Refresh to update "latest" if we re-visit
+        // We re-fetch locally via the effect if we wanted to update "latest", 
+        // but since we just calculated, we can just let it sit.
+        // Or triggers refetch:
+        setCurrentGrowthRecord({
+          child_id: selectedChildId,
+          age_in_months: age,
+          height: height,
+          weight: weight,
+          recorded_date: new Date().toISOString()
+        });
       }
     }
   };
@@ -116,6 +160,19 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord, r
 
       {/* --- LEFT COLUMN: INPUT FORM --- */}
       <div className="w-full lg:w-1/3 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 h-fit sticky top-24">
+
+        {/* Child Selector (Only if logged in and has children) */}
+        {childrenData && childrenData.length > 0 && (
+          <div className="mb-6 border-b border-gray-100 pb-6">
+            <ChildSelector
+              childrenData={childrenData}
+              selectedId={selectedChildId}
+              onSelect={setSelectedChildId}
+              label="Pilih Data Anak"
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-8">
           <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 text-xl">
             👤
