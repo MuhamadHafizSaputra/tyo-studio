@@ -116,11 +116,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
       return {
         age: `${std.month} Bln`,
-        heightIdeal: std.heightIdeal,
-        heightBorder: std.heightBorder,
         heightChild: rec ? rec.height : null,
-        weightIdeal: std.weightIdeal,
-        weightBorder: std.weightBorder,
         weightChild: rec ? rec.weight : null,
         zScore: zScore ? parseFloat(zScore) : null,
         ...std
