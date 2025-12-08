@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation'; // 👈 Import router
+import { toast } from 'sonner';
 
 import { createClient } from '../../utils/supabase/client';
 
@@ -12,12 +13,10 @@ export default function RegisterPage() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMsg(null);
 
     const supabase = createClient();
     const { error } = await supabase.auth.signUp({
@@ -31,16 +30,26 @@ export default function RegisterPage() {
     });
 
     if (error) {
-      setErrorMsg(error.message);
+      toast.error(error.message);
       setLoading(false);
     } else {
-      // Check if email confirmation is required? Usually Supabase defaults to requiring logic if not disabled.
-      // We assume for now we can redirect or show a message.
-      // Ideally show "Check your email" if session is null.
-      router.push('/profile'); // or login? or check email page
+      toast.success('Registrasi berhasil! Selamat datang.');
+      router.push('/profile');
       setLoading(false);
     }
   };
+
+  // Redirect if already logged in
+  React.useEffect(() => {
+    const checkUser = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/profile');
+      }
+    };
+    checkUser();
+  }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F3F9FA] p-4">
@@ -49,12 +58,6 @@ export default function RegisterPage() {
           <h1 className="text-2xl font-bold text-[var(--primary-color)] mb-2">Buat Akun Baru</h1>
           <p className="text-gray-500 text-sm">Bergabung bersama ribuan orang tua lainnya.</p>
         </div>
-
-        {errorMsg && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm text-center">
-            {errorMsg}
-          </div>
-        )}
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div>

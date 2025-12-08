@@ -7,8 +7,18 @@ export default async function CheckStuntingPage() {
 
   let childrenData: any[] = [];
   let latestGrowthRecord = null;
+  let userLocation = '';
 
   if (user) {
+    // Fetch User Profile for Location
+    const { data: userData } = await supabase
+      .from('users')
+      .select('location')
+      .eq('id', user.id)
+      .single();
+
+    userLocation = userData?.location || '';
+
     const { data: children } = await supabase.from('children').select('*').eq('user_id', user.id);
     childrenData = children || [];
 
@@ -47,7 +57,9 @@ export default async function CheckStuntingPage() {
           user={user}
           childrenData={childrenData}
           latestGrowthRecord={latestGrowthRecord}
+
           recommendations={finalRecommendations}
+          userLocation={userLocation}
         />
 
       </main>

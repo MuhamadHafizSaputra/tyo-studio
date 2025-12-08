@@ -1,26 +1,35 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Trash2, Baby, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { toast } from 'sonner';
 
 interface ProfileFormProps {
   user: any;
   initialParentName: string;
+  initialLocation: string;
   initialChildren: any[];
 }
 
-export default function ProfileForm({ user, initialParentName, initialChildren }: ProfileFormProps) {
+export default function ProfileForm({ user, initialParentName, initialLocation, initialChildren }: ProfileFormProps) {
   const router = useRouter();
   const supabase = createClient();
 
   // Parent State
   const [parentName, setParentName] = useState(initialParentName || '');
+  const [location, setLocation] = useState(initialLocation || 'Perkotaan');
   const [parentLoading, setParentLoading] = useState(false);
 
   // Children State
   const [childrenList, setChildrenList] = useState<any[]>(initialChildren || []);
   const [selectedChildId, setSelectedChildId] = useState<string | 'new'>('new'); // 'new' or UUID
+
+  // Delete Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [childToDelete, setChildToDelete] = useState<{ id: string, name: string } | null>(null);
 
   // Current Child Form State
   const emptyChildForm = {
@@ -41,11 +50,11 @@ export default function ProfileForm({ user, initialParentName, initialChildren }
 
     const { error } = await supabase
       .from('users')
-      .update({ full_name: parentName })
+      .update({ full_name: parentName, location: location })
       .eq('id', user.id);
 
-    if (error) alert('Gagal update profil bunda: ' + error.message);
-    else alert('Profil Bunda berhasil disimpan!');
+    if (error) toast.error('Gagal update profil bunda: ' + error.message);
+    else toast.success('Profil Bunda berhasil disimpan!');
 
     setParentLoading(false);
   };
@@ -96,7 +105,7 @@ export default function ProfileForm({ user, initialParentName, initialChildren }
       if (data) {
         setChildrenList([...childrenList, data[0]]);
         setSelectedChildId(data[0].id); // Switch to editing the new child
-        alert('Data anak berhasil ditambahkan!');
+        toast.success('Data anak berhasil ditambahkan!');
       }
     } else {
       // Update
@@ -104,14 +113,45 @@ export default function ProfileForm({ user, initialParentName, initialChildren }
       error = err;
       if (!error) {
         setChildrenList(childrenList.map(c => c.id === selectedChildId ? { ...c, ...payload, id: selectedChildId } : c));
-        alert('Data anak berhasil diperbarui!');
+        toast.success('Data anak berhasil diperbarui!');
       }
     }
 
-    if (error) alert('Error: ' + error.message);
+    if (error) toast.error('Error: ' + error.message);
     setChildLoading(false);
     router.refresh();
   };
+
+  const confirmDelete = (id: string, name: string) => {
+    setChildToDelete({ id, name });
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteChild = async () => {
+    if (!childToDelete) return;
+
+    setChildLoading(true);
+    const { error } = await supabase.from('children').delete().eq('id', childToDelete.id);
+
+    if (error) {
+      toast.error('Gagal menghapus: ' + error.message);
+    } else {
+      setChildrenList(childrenList.filter(c => c.id !== childToDelete.id));
+      // If we deleted the currently selected child, reset form to 'new'
+      if (selectedChildId === childToDelete.id) {
+        setSelectedChildId('new');
+        setChildForm(emptyChildForm);
+      }
+      toast.success('Data anak berhasil dihapus');
+    }
+    setChildLoading(false);
+    setShowDeleteModal(false);
+    setChildToDelete(null);
+  };
+
+
+
+
 
   return (
     <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -136,6 +176,19 @@ export default function ProfileForm({ user, initialParentName, initialChildren }
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
               <input type="email" value={user.email} disabled className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-400" />
             </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Lokasi Tempat Tinggal</label>
+              <select
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+              >
+                <option value="Perkotaan">Perkotaan (Kota Besar)</option>
+                <option value="Pedesaan">Pedesaan (Darat)</option>
+                <option value="Pesisir">Pesisir (Pantai/Laut)</option>
+                <option value="Pegunungan">Pegunungan (Dataran Tinggi)</option>
+              </select>
+            </div>
             <button type="submit" disabled={parentLoading} className="w-full py-2 bg-[var(--primary-color)] text-white text-sm font-bold rounded-lg hover:bg-teal-600 transition">
               {parentLoading ? 'Menyimpan...' : 'Simpan Profil Bunda'}
             </button>
@@ -155,27 +208,42 @@ export default function ProfileForm({ user, initialParentName, initialChildren }
           </div>
 
           <div className="space-y-2">
+
+
+
             {childrenList.map(child => (
-              <button
-                key={child.id}
-                onClick={() => handleSelectChild(child.id)}
-                className={`w-full text-left p-3 rounded-xl border transition flex items-center gap-3 ${selectedChildId === child.id ? 'border-[var(--primary-color)] bg-teal-50 ring-1 ring-[var(--primary-color)]' : 'border-gray-100 hover:border-gray-300'}`}
-              >
-                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-sm shadow-sm">
-                  {(child.gender === 'male' || child.gender === 'Laki-laki') ? '👦' : '👧'}
-                  {/* Careful with older data possibly being 'Laki-laki' */}
-                </div>
-                <div>
-                  <p className="font-bold text-sm text-gray-800">{child.name}</p>
-                  <p className="text-xs text-gray-500">{new Date(child.date_of_birth).getFullYear()} •
-                    {(child.gender === 'male' || child.gender === 'Laki-laki') ? ' Laki-laki' : ' Perempuan'}
-                  </p>
-                </div>
-              </button>
+              <div key={child.id} className="flex gap-2">
+                <button
+                  onClick={() => handleSelectChild(child.id)}
+                  className={`flex-1 text-left p-3 rounded-xl border transition flex items-center gap-3 ${selectedChildId === child.id ? 'border-[var(--primary-color)] bg-teal-50 ring-1 ring-[var(--primary-color)]' : 'border-gray-100 hover:border-gray-300'}`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-sm shadow-sm">
+                    {(child.gender === 'male' || child.gender === 'Laki-laki') ? '👦' : '👧'}
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-gray-800">{child.name}</p>
+                    <p className="text-xs text-gray-500">{new Date(child.date_of_birth).getFullYear()} •
+                      {(child.gender === 'male' || child.gender === 'Laki-laki') ? ' Laki-laki' : ' Perempuan'}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => confirmDelete(child.id, child.name)}
+                  className="p-3 rounded-xl border border-red-100 text-red-500 hover:bg-red-50 hover:border-red-200 transition flex items-center justify-center"
+                  title="Hapus Data"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
             ))}
 
             {childrenList.length === 0 && (
-              <p className="text-sm text-gray-400 italic text-center py-4">Belum ada data anak.</p>
+              <EmptyState
+                icon={Baby}
+                title="Belum ada data anak"
+                description="Tambahkan data si kecil untuk mulai memantau tumbuh kembangnya."
+                className="py-8"
+              />
             )}
           </div>
         </div>
@@ -279,6 +347,46 @@ export default function ProfileForm({ user, initialParentName, initialChildren }
         </form>
       </div>
 
+      {/* Delete Confirmation Modal */}
+      {
+        showDeleteModal && childToDelete && (
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl transform transition-all scale-100">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Hapus Data Anak?</h3>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p className="text-gray-600 mb-6 text-sm leading-relaxed">
+                Apakah Bunda yakin ingin menghapus data <strong className="text-gray-800">{childToDelete?.name}</strong>?
+                <br /><br />
+                <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded">⚠️ Data yang dihapus tidak dapat dikembalikan.</span>
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition text-sm"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleDeleteChild}
+                  disabled={childLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition shadow-md text-sm disabled:opacity-70"
+                >
+                  {childLoading ? 'Menghapus...' : 'Ya, Hapus'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
     </div>
   );
 }

@@ -4,18 +4,17 @@ import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../utils/supabase/client';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMsg(null);
 
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
@@ -24,9 +23,10 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setErrorMsg(error.message);
+      toast.error('Email atau password salah.');
       setLoading(false);
     } else {
+      toast.success('Login berhasil!');
       router.push('/profile');
       router.refresh();
     }
@@ -39,12 +39,6 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-[var(--primary-color)] mb-2">Selamat Datang Kembali</h1>
           <p className="text-gray-500 text-sm">Masuk untuk memantau perkembangan si kecil.</p>
         </div>
-
-        {errorMsg && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm text-center">
-            {errorMsg}
-          </div>
-        )}
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
