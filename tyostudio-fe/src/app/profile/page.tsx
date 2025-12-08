@@ -15,7 +15,8 @@ export default async function ProfilePage() {
   // Fetch Public User Profile
   const { data: userData } = await supabase
     .from('users')
-    .select('full_name')
+
+    .select('full_name, location')
     .eq('id', user.id)
     .single();
 
@@ -36,6 +37,7 @@ export default async function ProfilePage() {
         <ProfileForm
           user={user}
           initialParentName={userData?.full_name || ''}
+          initialLocation={userData?.location || ''}
           initialChildren={childrenData || []}
         />
       </main>

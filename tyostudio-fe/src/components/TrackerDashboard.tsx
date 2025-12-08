@@ -6,6 +6,8 @@ import {
 } from 'recharts';
 import { useRouter } from 'next/navigation';
 import ChildSelector from './ChildSelector';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ClipboardList } from 'lucide-react';
 
 interface TrackerDashboardProps {
   user: any;
@@ -151,72 +153,55 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
           </div>
         </div>
 
-        {/* Selector */}
-        <div className="w-full md:w-64">
-          {allChildren && (
+        {/* Child Selector */}
+        {allChildren && allChildren.length > 0 && (
+          <div className="w-full md:w-64">
             <ChildSelector
               childrenData={allChildren}
               selectedId={child?.id}
               onSelect={handleChildSelect}
-              label="Lihat Data Anak:"
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* --- AREA GRAFIK (KIRI) --- */}
+        {/* --- AREA KIRI (CHART) --- */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-
-            {/* Header Grafik & Tab Switcher */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-              <div>
-                <h3 className="font-bold text-xl text-gray-800">Grafik Pertumbuhan</h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  Membandingkan dengan standar WHO
-                </p>
-              </div>
-
-              {/* Tab Switcher */}
-              <div className="flex bg-gray-50 p-1.5 rounded-xl border border-gray-100">
-                {['height', 'weight', 'zscore'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab as any)}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 capitalize ${activeTab === tab
-                      ? 'bg-white text-[var(--primary-color)] shadow-sm scale-105'
-                      : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                  >
-                    {tab === 'zscore' ? 'Z-Score' : tab === 'height' ? 'Tinggi' : 'Berat'}
-                  </button>
-                ))}
+            {/* Header Chart Tabs */}
+            <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+              <h3 className="font-bold text-gray-800 text-lg">Grafik Pertumbuhan</h3>
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setActiveTab('height')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'height' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Tinggi
+                </button>
+                <button
+                  onClick={() => setActiveTab('weight')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'weight' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Berat
+                </button>
+                <button
+                  onClick={() => setActiveTab('zscore')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'zscore' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Z-Score
+                </button>
               </div>
             </div>
 
-            {/* Chart Container */}
-            <div className="h-[380px] w-full">
+            {/* CHART CONTAINER */}
+            <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis
-                    dataKey="age"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 12, fontWeight: 500 }}
-                    dy={15}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                    domain={['auto', 'auto']}
-                  />
-                  <Tooltip cursor={{ stroke: '#E5E7EB', strokeWidth: 2 }} content={<CustomTooltip mode={activeTab} />} />
-
-                  {/* --- KONFIGURASI GARIS SESUAI GAMBAR REFERENSI --- */}
+                <LineChart data={chartData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="age" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dx={-10} />
+                  <Tooltip content={<CustomTooltip mode={activeTab} />} cursor={{ stroke: '#E5E7EB', strokeWidth: 2 }} />
 
                   {/* MODE TINGGI BADAN */}
                   {activeTab === 'height' && (
@@ -302,7 +287,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
             <div className="space-y-4">
               <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
                 <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  🐟
+                  <span>🐟</span>
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-800 text-sm">Ikan Kembung Kuah Asam</h4>
@@ -311,7 +296,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               </div>
               <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
                 <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  🥛
+                  <span>🥛</span>
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-800 text-sm">Susu Tinggi Kalori</h4>
@@ -353,13 +338,46 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                 )}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic text-center py-4">Belum ada riwayat update data.</p>
+              <EmptyState
+                icon={ClipboardList}
+                title="Belum ada riwayat"
+                description="Data pengukuran akan muncul di sini setelah Anda melakukan pengecekan."
+                className="py-12"
+              />
             )}
-
           </div>
 
         </div>
       </div>
+
+      {/* History Table */}
+      {growthRecords && growthRecords.length > 0 && (
+        <div className="mt-8 border-t border-gray-100 pt-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Riwayat Pengukuran</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 rounded-l-lg">Tanggal</th>
+                  <th className="px-4 py-3">Usia (Bulan)</th>
+                  <th className="px-4 py-3">Tinggi (cm)</th>
+                  <th className="px-4 py-3 rounded-r-lg">Berat (kg)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...growthRecords].reverse().map((record: any, index: number) => (
+                  <tr key={index} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{record.recorded_date ? new Date(record.recorded_date).toLocaleDateString('id-ID') : '-'}</td>
+                    <td className="px-4 py-3">{record.age_in_months}</td>
+                    <td className="px-4 py-3 text-[var(--primary-color)] font-bold">{record.height}</td>
+                    <td className="px-4 py-3 text-orange-400 font-bold">{record.weight}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

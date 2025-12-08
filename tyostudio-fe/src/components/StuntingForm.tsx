@@ -2,29 +2,44 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { useRouter } from 'next/navigation';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { format, differenceInMonths } from "date-fns";
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Activity } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
 import ChildSelector from './ChildSelector';
+import { toast } from 'sonner';
 
-interface StuntingFormProps {
-  user: any;
-  childrenData: any[]; // All children
-  latestGrowthRecord: any; // Initial record (optional/deprecated if we fetch client side on change)
-  recommendations: any[];
-}
+const initialRecord = {
+  child_id: '',
+  age_in_months: '',
+  height: '',
+  weight: '',
+  recorded_date: ''
+};
 
-export default function StuntingForm({ user, childrenData, latestGrowthRecord: initialRecord, recommendations }: StuntingFormProps) {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(!!user);
-
+export default function StuntingForm({
+  user,
+  childrenData,
+  latestGrowthRecord,
+  recommendations,
+  userLocation
+}: {
+  user?: any,
+  childrenData?: any[],
+  latestGrowthRecord?: any,
+  recommendations?: any[],
+  userLocation?: string
+}) {
   // --- STATE ---
-  // Default to empty to allow manual input first
   const [selectedChildId, setSelectedChildId] = useState<string>('');
-  const [currentGrowthRecord, setCurrentGrowthRecord] = useState<any>(initialRecord);
+  const [currentGrowthRecord, setCurrentGrowthRecord] = useState<any>(latestGrowthRecord || initialRecord);
 
   const selectedChild = childrenData?.find(c => c.id === selectedChildId);
 
   const [formData, setFormData] = useState({
-    age: '',
+    dob: '',
+    ageDisplay: '',
     gender: 'Laki-laki',
     weight: '',
     height: '',
@@ -35,69 +50,120 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord: i
     status: string;
     description: string;
     isStunting: boolean;
+    bmi: number;
+    bmiStatus: string;
   } | null>(null);
 
-  // --- EFFECTS ---
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
 
-  // 1. Fetch latest record when selected child changes
+  // Static Fallback Recommendations
+  const staticRecommendations = [
+    {
+      name: "Bubur Hati Ayam Bayam",
+      calories: 250,
+      protein: 15,
+      fats: 10,
+      description: "Kaya zat besi dan protein untuk mencegah anemia dan stunting.",
+      image_url: null
+    },
+    {
+      name: "Sop Ikan Telur Puyuh",
+      calories: 200,
+      protein: 18,
+      fats: 8,
+      description: "Protein hewani ganda (ikan & telur) sangat efektif untuk pertumbuhan.",
+      image_url: null
+    },
+    {
+      name: "Tahu Kukus Daging Sapi",
+      calories: 180,
+      protein: 12,
+      fats: 9,
+      description: "Tekstur lembut, mudah dicerna dan tinggi kalori.",
+      image_url: null
+    }
+  ];
+
+  // 1. Auto-select first child if available
   useEffect(() => {
-    const fetchLatestRecord = async () => {
-      if (!selectedChildId) return;
+    if (childrenData && childrenData.length > 0 && !selectedChildId) {
+      setSelectedChildId(childrenData[0].id);
+    }
+  }, [childrenData]);
 
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('growth_records')
-        .select('*')
-        .eq('child_id', selectedChildId)
-        .order('recorded_date', { ascending: false })
-        .limit(1)
-        .single();
-
-      setCurrentGrowthRecord(data || null);
-    };
-
+  // 2. Fetch latest growth record & Prefill Form when child selected
+  useEffect(() => {
     if (selectedChildId) {
-      fetchLatestRecord();
+      const fetchLastRecord = async () => {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('growth_records')
+          .select('*')
+          .eq('child_id', selectedChildId)
+          .order('recorded_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (data) setCurrentGrowthRecord(data);
+        else setCurrentGrowthRecord(initialRecord);
+      };
+
+      fetchLastRecord();
     }
   }, [selectedChildId]);
 
-  // 2. Auto-fill form when child or record changes
+  // Sync Form with Selected Child & Record
   useEffect(() => {
     if (selectedChild) {
-      // Calculate age in months if DOB exists
-      let ageInMonths = '';
-      if (selectedChild.date_of_birth) {
-        const dob = new Date(selectedChild.date_of_birth);
-        const now = new Date();
-        const months = (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
-        ageInMonths = Math.max(0, months).toString();
-      }
+      const dobString = selectedChild.date_of_birth ? new Date(selectedChild.date_of_birth).toISOString().split('T')[0] : '';
 
-      setFormData({
-        age: ageInMonths,
+      setFormData(prev => ({
+        ...prev,
+        dob: dobString,
         gender: selectedChild.gender || 'Laki-laki',
-        // Use latest record if available, else birth stats, else empty
         weight: currentGrowthRecord?.weight?.toString() || selectedChild.birth_weight?.toString() || '',
         height: currentGrowthRecord?.height?.toString() || selectedChild.birth_height?.toString() || '',
-      });
+      }));
     } else {
-      // Reset if no child selected (e.g. user has no children)
-      setFormData({ age: '', gender: 'Laki-laki', weight: '', height: '' });
+      setFormData({ dob: '', ageDisplay: '', gender: 'Laki-laki', weight: '', height: '' });
     }
   }, [selectedChild, currentGrowthRecord]);
+
+  // 3. Calculate Age Display whenever DOB changes
+  useEffect(() => {
+    if (formData.dob) {
+      const birthDate = new Date(formData.dob);
+      const today = new Date();
+      const months = differenceInMonths(today, birthDate);
+      const years = Math.floor(months / 12);
+      const remainingMonths = months % 12;
+
+      let display = `${months} Bulan`;
+      if (years > 0) {
+        display = `${years} Tahun ${remainingMonths > 0 ? `${remainingMonths} Bulan` : ''}`;
+      }
+      setFormData(prev => ({ ...prev, ageDisplay: display }));
+    } else {
+      setFormData(prev => ({ ...prev, ageDisplay: '' }));
+    }
+  }, [formData.dob]);
 
 
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.age || !formData.weight || !formData.height) return;
+    if (!formData.dob || !formData.weight || !formData.height) return;
 
-    // --- LOGIKA SIMULASI Z-SCORE ---
-    // Rumus kasar untuk demo: (TinggiAnak - Median) / StdDev
+    setAiLoading(true); // START LOADING
+
+    // Hitung umur bulan real-time saat submit
+    const birthDate = new Date(formData.dob);
+    const age = Math.max(0, differenceInMonths(new Date(), birthDate)); // Bulan
+
     const height = parseFloat(formData.height);
     const weight = parseFloat(formData.weight);
-    const age = parseFloat(formData.age); // Bulan
 
-    // Median kasar (Age * 0.7 + 60)
+
     const medianHeight = (age * 0.7) + 60;
     const stdDev = 3;
 
@@ -117,12 +183,57 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord: i
       desc = 'Pertumbuhan anak sangat pesat diatas rata-rata.';
     }
 
+    // Hitung BMI
+    // Rumus: Berat (kg) / (Tinggi (m) * Tinggi (m))
+    const heightInMeters = height / 100;
+    const bmiVal = weight / (heightInMeters * heightInMeters);
+    const bmiFixed = parseFloat(bmiVal.toFixed(1));
+
+    let bmiStatus = 'Normal';
+    if (bmiFixed < 18.5) bmiStatus = 'Kurus';
+    else if (bmiFixed >= 25) bmiStatus = 'Gemuk';
+
     setResult({
       zScore: zScoreFixed,
-      status,
+      status: status,
       description: desc,
-      isStunting
+      isStunting: isStunting,
+      bmi: bmiFixed,
+      bmiStatus: bmiStatus
     });
+
+    // --- AI GENERATION ---
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      const prompt = `Berikan 3 rekomendasi menu makanan lokal Indonesia yang murah dan bergizi untuk anak usia ${age} bulan dengan kondisi ${status} (Z-Score: ${zScoreFixed}) dan BMI ${bmiStatus}. 
+      Lokasi pengguna berada di daerah: ${userLocation || 'Indonesia'}. Sesuaikan bahan makanan dengan ketersediaan di daerah tersebut (misal: pesisir banyak ikan, pegunungan banyak sayur).
+      
+      Format respon dalam JSON array seperti ini (tanpa markdown):
+      [
+        {
+          "name": "Nama Menu",
+          "calories": 200,
+          "protein": 10,
+          "fats": 5,
+          "description": "Alasan singkat kenapa menu ini cocok (max 15 kata)."
+        }
+      ]`;
+
+      const resultAI = await model.generateContent(prompt);
+      const responseText = resultAI.response.text();
+      const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const recommendationsAI = JSON.parse(cleanedText);
+
+      setAiRecommendations(recommendationsAI);
+    } catch (err) {
+      console.error("AI Error:", err);
+      toast.error('Gagal mendapatkan rekomendasi AI. Menggunakan rekomendasi standar.');
+      setAiRecommendations([]); // Fallback to static
+    }
+
+    setAiLoading(false);
 
     // Save to Database if Child Exists
     if (selectedChildId) {
@@ -139,11 +250,10 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord: i
       ]);
       if (error) {
         console.error('Error saving growth record:', error);
+        toast.error('Gagal menyimpan riwayat: ' + error.message);
       } else {
         console.log('Growth record saved');
-        // We re-fetch locally via the effect if we wanted to update "latest", 
-        // but since we just calculated, we can just let it sit.
-        // Or triggers refetch:
+        toast.success('Riwayat pertumbuhan berhasil disimpan!');
         setCurrentGrowthRecord({
           child_id: selectedChildId,
           age_in_months: age,
@@ -154,6 +264,9 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord: i
       }
     }
   };
+
+  // Determine which recommendations to show
+  const displayRecommendations = aiRecommendations.length > 0 ? aiRecommendations : staticRecommendations;
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
@@ -183,14 +296,18 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord: i
         <form onSubmit={handleCalculate} className="flex flex-col gap-6">
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Umur (Bulan)</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Lahir</label>
               <input
-                type="number"
+                type="date"
                 className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent outline-none transition-all"
-                placeholder="12"
-                value={formData.age}
-                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                value={formData.dob}
+                onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
               />
+              {formData.ageDisplay && (
+                <p className="text-sm text-[var(--primary-color)] mt-1 font-medium">
+                  Usia: {formData.ageDisplay}
+                </p>
+              )}
             </div>
             <div className="flex-1">
               <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Kelamin</label>
@@ -237,9 +354,10 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord: i
 
           <button
             type="submit"
-            className="w-full bg-[var(--primary-color)] text-white font-bold py-3.5 rounded-lg hover:bg-teal-600 transition-colors shadow-md mt-2"
+            disabled={aiLoading}
+            className="w-full bg-[var(--primary-color)] text-white font-bold py-3.5 rounded-lg hover:bg-teal-600 transition-colors shadow-md mt-2 disabled:opacity-70"
           >
-            Hitung Sekarang
+            {aiLoading ? 'Menganalisis...' : 'Hitung Sekarang'}
           </button>
         </form>
       </div>
@@ -248,83 +366,78 @@ export default function StuntingForm({ user, childrenData, latestGrowthRecord: i
       <div className="w-full lg:w-2/3 space-y-6">
 
         {/* 1. Result Card (Red/Green Box) */}
-        {result ? (
-          <div className={`rounded-xl p-6 border-l-4 shadow-sm animate-fade-in ${result.isStunting ? 'bg-[#FFF5F5] border-[#FF5252]' : 'bg-[#E8F5F3] border-[var(--primary-color)]'}`}>
-            <div className="flex items-start gap-4">
-              <div className={`mt-1 text-2xl`}>
-                {result.isStunting ? '❗' : '✅'}
+        {aiLoading ? (
+          <Skeleton className="h-48 w-full rounded-2xl" />
+        ) : result ? (
+          <div className={`p-8 rounded-2xl border-l-8 shadow-sm transition-all duration-500 transform translate-y-0 opacity-100 ${result.isStunting ? 'bg-red-50 border-red-500' : 'bg-teal-50 border-teal-500'}`}>
+            <h3 className={`text-2xl font-bold mb-3 ${result.isStunting ? 'text-red-700' : 'text-teal-800'}`}>
+              {result.status}
+            </h3>
+            <p className="text-gray-700 leading-relaxed text-lg">
+              {result.description}
+            </p>
+            <div className="mt-6 flex gap-4">
+              <div className="bg-white/60 p-3 rounded-lg flex-1">
+                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Z-Score</span>
+                <p className="text-2xl font-black text-gray-800">{result.zScore}</p>
               </div>
-              <div>
-                <h3 className={`text-2xl font-bold mb-1 ${result.isStunting ? 'text-[#C0392B]' : 'text-[#00b894]'}`}>
-                  {result.status}
-                </h3>
-                <p className="font-bold text-gray-700 mb-2 text-sm">Z-Score: {result.zScore} SD</p>
-                <p className="text-gray-600 text-sm">{result.description}</p>
+              <div className="bg-white/60 p-3 rounded-lg flex-1">
+                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Status</span>
+                <p className="text-xl font-bold text-gray-800">{result.status}</p>
+              </div>
+              <div className="bg-white/60 p-3 rounded-lg flex-1">
+                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">BMI</span>
+                <p className="text-2xl font-black text-gray-800">{result.bmi}</p>
+                <p className="text-xs text-gray-600 font-medium">{result.bmiStatus}</p>
               </div>
             </div>
           </div>
         ) : (
-          // Empty State
-          <div className="h-[200px] flex flex-col items-center justify-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-400">
-            <span className="text-4xl mb-2">📊</span>
-            <p>Hasil analisis akan muncul di sini</p>
-          </div>
+          <EmptyState
+            icon={Activity}
+            title="Hasil Analisis"
+            description="Masukkan data si kecil dan tekan tombol Hitung untuk melihat hasil analisis status gizi."
+          />
         )}
 
-        {/* 2. Recommendations & Menus (Muncul setelah ada result) */}
+        {/* 2. Recommendations List (Card Style) */}
         {result && (
-          <div className="animate-fade-in-up space-y-6">
+          <div>
+            <h3 className="font-bold text-gray-800 text-xl mb-4 flex items-center gap-2">
+              <span>🍽️</span> Rekomendasi Menu Gizi Seimbang
+            </h3>
 
-            {/* Text Header */}
-            <div className="flex items-center gap-2">
-              <span className="text-[var(--primary-color)] text-xl font-bold">Ψ</span>
-              <h3 className="text-lg font-bold text-gray-800">Rekomendasi Menu</h3>
-            </div>
-
-            {/* Info Cards (Pink & Orange backgrounds like design) */}
-            <div className="grid gap-4">
-              <div className="bg-[#FFF0F0] border border-[#FFDddd] p-4 rounded-lg">
-                <h4 className="font-bold text-[#D32F2F] mb-1 text-sm">Menu Tinggi Protein Hewani</h4>
-                <p className="text-xs text-[#D32F2F] opacity-80">Telur dan Ikan kembung untuk kejar tumbuh.</p>
+            {aiLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Skeleton className="h-32 w-full rounded-2xl" />
+                <Skeleton className="h-32 w-full rounded-2xl" />
               </div>
-              <div className="bg-[#FFF8E1] border border-[#FFECB3] p-4 rounded-lg">
-                <h4 className="font-bold text-[#F57C00] mb-1 text-sm">Pentingnya Zat Besi</h4>
-                <p className="text-xs text-[#F57C00] opacity-80">Cegah anemia yang menghambat pertumbuhan.</p>
-              </div>
-            </div>
-
-            {/* Login CTA Bar (Design Green) */}
-            {!isLoggedIn && (
-              <div className="bg-[var(--primary-color)] rounded-lg p-5 text-white flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
-                <div>
-                  <h4 className="font-bold text-md">Ingin simpan data ini?</h4>
-                  <p className="opacity-90 text-xs">Login untuk melihat grafik perkembangan.</p>
-                </div>
-                <button className="bg-white text-[var(--primary-color)] px-5 py-2 rounded text-sm font-bold hover:bg-gray-50 transition" onClick={() => router.push('/login')}>
-                  Login & Track
-                </button>
-              </div>
-            )}
-
-            {/* Food Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-              {recommendations.map((item) => (
-                <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="relative h-32 w-full">
-                    <img src={item.image_url || item.img} alt={item.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-bold text-md mb-3 text-gray-800">{item.name}</h4>
-                    <div className="text-xs space-y-1 text-gray-500">
-                      <div className="flex justify-between">
-                        <span>{item.calories} Kal</span>
-                        <span className="font-medium text-gray-700">{item.protein}g | {item.fats}g</span>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {displayRecommendations.map((item, i) => (
+                  <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="relative h-32 w-full bg-gray-100 flex items-center justify-center text-4xl">
+                      {/* Gemini doesn't return images, so we use a placeholder or conditional */}
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>🥘</span>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h4 className="font-bold text-md mb-3 text-gray-800">{item.name}</h4>
+                      <div className="text-xs space-y-1 text-gray-500">
+                        <div className="flex justify-between">
+                          <span>{item.calories} Kal</span>
+                          <span className="font-medium text-gray-700">{item.protein}g P | {item.fats}g L</span>
+                        </div>
+                        <p className="italic text-[10px] mt-2 text-gray-400 line-clamp-2">{item.description}</p>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
           </div>
         )}
