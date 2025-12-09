@@ -2,11 +2,15 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'sonner';
+import Logo from '@/assets/logo.png';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'TyoStudio - Solusi Kebutuhan MPASI Anda',
+  icons: {
+    icon: Logo.src,
+  },
+  title: 'Teman Ibu',
   description: 'Aplikasi pemantau tumbuh kembang dan resep MPASI',
 };
 
