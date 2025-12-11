@@ -1,6 +1,6 @@
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-gray-50 border-t border-gray-200 pt-16 pb-12 mt-20">
+    <footer className="bg-gray-50 border-t border-gray-200 pt-16 pb-12">
       <div className="container mx-auto px-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
 
