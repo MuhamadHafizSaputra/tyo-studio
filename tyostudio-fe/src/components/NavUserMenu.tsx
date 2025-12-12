@@ -44,11 +44,8 @@ export default function NavUserMenu({ user }: NavUserMenuProps) {
 
   return (
     <div className="flex gap-3">
-      <Link href="/login" className="px-5 py-2 rounded-full border border-[var(--primary-color)] text-[var(--primary-color)] font-semibold hover:bg-teal-50 transition">
+      <Link href="/login" className="px-5 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold hover:bg-teal-600 transition shadow-sm">
         Masuk
-      </Link>
-      <Link href="/register" className="px-5 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold hover:bg-teal-600 transition shadow-sm">
-        Daftar
       </Link>
     </div>
   );

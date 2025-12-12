@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: 'Aplikasi pemantau tumbuh kembang dan resep MPASI',
 };
 
-import Navbar from '@/components/Navbar';
+
 
 export default function RootLayout({
   children,
@@ -24,7 +24,6 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className={inter.className}>
-        <Navbar />
         {children}
         <Toaster position="top-center" richColors closeButton />
       </body>

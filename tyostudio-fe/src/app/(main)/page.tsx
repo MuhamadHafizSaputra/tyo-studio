@@ -1,8 +1,8 @@
-import Hero from '../components/Hero';
-import Features from '../components/Features'; // Komponen Baru
-import FoodCard from '../components/FoodCard';
-import BiometricSection from '../components/BiometricSection';
-import HowItWorks from '../components/HowItWorks'; // Komponen Baru
+import Hero from '../../components/Hero';
+import Features from '../../components/Features'; // Komponen Baru
+import FoodCard from '../../components/FoodCard';
+import BiometricSection from '../../components/BiometricSection';
+import HowItWorks from '../../components/HowItWorks'; // Komponen Baru
 
 function LandingPage() {
   // Data dummy saran nutrisi 
@@ -52,7 +52,7 @@ function LandingPage() {
         <HowItWorks />
 
         {/* Section 5: CTA (Call to Action) */}
-        <section className="container mx-auto px-5">
+        <section className="container mx-auto px-5 mb-20">
           <div className="bg-[var(--primary-color)] text-white text-center py-16 px-6 rounded-3xl mx-auto max-w-5xl shadow-2xl shadow-teal-200">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">Siap Memantau Tumbuh Kembang Anak?</h2>
             <p className="text-lg opacity-90 mb-10 max-w-2xl mx-auto">

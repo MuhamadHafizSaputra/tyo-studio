@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import TrackerDashboard from '../../components/TrackerDashboard';
+import TrackerDashboard from '../../../components/TrackerDashboard';
 import { createClient } from '@/utils/supabase/server';
 
 
