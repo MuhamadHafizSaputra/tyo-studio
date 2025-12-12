@@ -7,7 +7,10 @@ import {
 import { useRouter } from 'next/navigation';
 import ChildSelector from './ChildSelector';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { ClipboardList } from 'lucide-react';
+import AddGrowthRecordModal from './AddGrowthRecordModal';
+import { ClipboardList, PlusCircle, Trash2 } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+import { toast } from 'sonner';
 
 interface TrackerDashboardProps {
   user: any;
@@ -83,12 +86,31 @@ const CustomTooltip = ({ active, payload, label, mode }: any) => {
 export default function TrackerDashboard({ user, child, allChildren, growthRecords }: TrackerDashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'height' | 'weight' | 'zscore'>('height');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Handle Child Switch
   const handleChildSelect = (childId: string) => {
     // Navigate to same page but with new childId query param
     // This triggers SSR re-fetch in page.tsx
     router.push(`/track?childId=${childId}`);
+  };
+
+  // Handle Delete Record
+  const handleDeleteRecord = async (recordId: string) => {
+    if (confirm('Apakah Anda yakin ingin menghapus data pengukuran ini?')) {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('growth_records')
+        .delete()
+        .eq('id', recordId);
+
+      if (error) {
+        toast.error('Gagal menghapus data: ' + error.message);
+      } else {
+        toast.success('Data pengukuran berhasil dihapus');
+        router.refresh();
+      }
+    }
   };
 
   // Merge Standard Data with User Data
@@ -153,22 +175,35 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
           </div>
         </div>
 
-        {/* Child Selector */}
-        {allChildren && allChildren.length > 0 && (
-          <div className="w-full md:w-64">
-            <ChildSelector
-              childrenData={allChildren}
-              selectedId={child?.id}
-              onSelect={handleChildSelect}
-            />
-          </div>
-        )}
+        {/* Child Selector & Add Button */}
+        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+          {allChildren && allChildren.length > 0 && (
+            <div className="w-full md:w-64">
+              <ChildSelector
+                childrenData={allChildren}
+                selectedId={child?.id}
+                onSelect={handleChildSelect}
+              />
+            </div>
+          )}
+
+          {/* Add Data Button */}
+          {child && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex justify-center items-center gap-2 px-6 py-3 bg-[var(--primary-color)] text-white font-bold rounded-xl shadow-lg shadow-teal-100 hover:bg-teal-700 transition"
+            >
+              <PlusCircle size={20} />
+              Catat Data
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* --- AREA KIRI (CHART) --- */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             {/* Header Chart Tabs */}
             <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
               <h3 className="font-bold text-gray-800 text-lg">Grafik Pertumbuhan</h3>
@@ -276,15 +311,15 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
           </div>
         </div>
 
-        {/* --- AREA KANAN (MENU & LOG) --- */}
-        <div className="space-y-6">
-
-          {/* Kartu Menu */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50">
+        {/* --- AREA KANAN (MENU REKOMENDASI) --- */}
+        <div className="h-full">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col max-h-[500px]">
+            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50 shrink-0">
               🍽️ Menu Rekomendasi
             </h3>
-            <div className="space-y-4">
+
+            <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+
               <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
                 <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
                   <span>🐟</span>
@@ -294,6 +329,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                   <p className="text-xs text-gray-500 mt-1">Mengandung Omega-3 tinggi untuk perkembangan otak & protein.</p>
                 </div>
               </div>
+
               <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
                 <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
                   <span>🥛</span>
@@ -303,50 +339,39 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                   <p className="text-xs text-gray-500 mt-1">Tambahan 2 gelas sehari untuk mengejar berat badan.</p>
                 </div>
               </div>
+
+              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
+                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
+                  <span>🥑</span>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-800 text-sm">Alpukat Kerok Susu</h4>
+                  <p className="text-xs text-gray-500 mt-1">Lemak sehat tinggi kalori yang mudah dicerna balita.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
+                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
+                  <span>🥩</span>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-800 text-sm">Bola Daging Cincang</h4>
+                  <p className="text-xs text-gray-500 mt-1">Sumber zat besi dan protein hewani yang sangat baik.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
+                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
+                  <span>🥣</span>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-800 text-sm">Bubur Kacang Hijau</h4>
+                  <p className="text-xs text-gray-500 mt-1">Snack sehat kaya serat dan vitamin B kompleks.</p>
+                </div>
+              </div>
+
             </div>
           </div>
-
-          {/* Riwayat (Log Updates) */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50">
-              📋 Riwayat Update
-            </h3>
-
-            {historyLogs && historyLogs.length > 0 ? (
-              <div className="relative border-l-2 border-gray-100 ml-3 space-y-6 py-2">
-                {historyLogs.map((log, idx) => (
-                  <div key={idx} className="relative pl-6">
-                    {/* Dot Indicator (Top one is distinct) */}
-                    <div className={`absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-[var(--primary-color)] scale-125 ring-2 ring-teal-100' : 'bg-gray-300'}`}></div>
-
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 mb-0.5">
-                        {log.recorded_date ? new Date(log.recorded_date).toLocaleDateString() : 'Baru saja'}
-                        <span className="mx-1">•</span>
-                        {log.age_in_months} Bulan
-                      </p>
-                      <div className="font-medium text-gray-800 text-sm">
-                        Tinggi: <strong>{log.height}</strong> cm, Berat: <strong>{log.weight}</strong> kg
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {growthRecords.length > 5 && (
-                  <div className="pl-6 text-xs text-gray-400 italic">
-                    ... dan {growthRecords.length - 5} data lainnya.
-                  </div>
-                )}
-              </div>
-            ) : (
-              <EmptyState
-                icon={ClipboardList}
-                title="Belum ada riwayat"
-                description="Data pengukuran akan muncul di sini setelah Anda melakukan pengecekan."
-                className="py-12"
-              />
-            )}
-          </div>
-
         </div>
       </div>
 
@@ -361,7 +386,8 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                   <th className="px-4 py-3 rounded-l-lg">Tanggal</th>
                   <th className="px-4 py-3">Usia (Bulan)</th>
                   <th className="px-4 py-3">Tinggi (cm)</th>
-                  <th className="px-4 py-3 rounded-r-lg">Berat (kg)</th>
+                  <th className="px-4 py-3">Berat (kg)</th>
+                  <th className="px-4 py-3 rounded-r-lg text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -371,12 +397,32 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                     <td className="px-4 py-3">{record.age_in_months}</td>
                     <td className="px-4 py-3 text-[var(--primary-color)] font-bold">{record.height}</td>
                     <td className="px-4 py-3 text-orange-400 font-bold">{record.weight}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleDeleteRecord(record.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                        title="Hapus Data"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {/* MODAL */}
+      {child && (
+        <AddGrowthRecordModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          childId={child.id}
+          childDob={child.date_of_birth}
+          childName={child.name}
+        />
       )}
     </div>
   );
