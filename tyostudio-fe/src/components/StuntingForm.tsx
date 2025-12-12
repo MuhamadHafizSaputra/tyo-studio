@@ -3,12 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { format, differenceInMonths } from "date-fns";
+import { differenceInMonths } from "date-fns";
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Activity } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import ChildSelector from './ChildSelector';
 import { toast } from 'sonner';
+
+// --- IMPORT BARU (LOGIKA CERDAS KATEGORI UMUR) ---
+import { assessNutritionalStatus } from '@/lib/calculator';
 
 const initialRecord = {
   child_id: '',
@@ -49,7 +52,7 @@ export default function StuntingForm({
     zScore: number;
     status: string;
     description: string;
-    isStunting: boolean;
+    isStunting: boolean; // Flag untuk menentukan warna box (Merah/Hijau)
     bmi: number;
     bmiStatus: string;
   } | null>(null);
@@ -92,7 +95,7 @@ export default function StuntingForm({
     }
   }, [childrenData]);
 
-  // 2. Fetch latest growth record & Prefill Form when child selected
+  // 2. Fetch latest growth record & Prefill Form
   useEffect(() => {
     if (selectedChildId) {
       const fetchLastRecord = async () => {
@@ -113,7 +116,7 @@ export default function StuntingForm({
     }
   }, [selectedChildId]);
 
-  // Sync Form with Selected Child & Record
+  // Sync Form with Selected Child
   useEffect(() => {
     if (selectedChild) {
       const dobString = selectedChild.date_of_birth ? new Date(selectedChild.date_of_birth).toISOString().split('T')[0] : '';
@@ -130,7 +133,7 @@ export default function StuntingForm({
     }
   }, [selectedChild, currentGrowthRecord]);
 
-  // 3. Calculate Age Display whenever DOB changes
+  // 3. Calculate Age Display
   useEffect(() => {
     if (formData.dob) {
       const birthDate = new Date(formData.dob);
@@ -150,74 +153,67 @@ export default function StuntingForm({
   }, [formData.dob]);
 
 
+  // ===============================================
+  // CORE CALCULATION LOGIC (UPDATED)
+  // ===============================================
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.dob || !formData.weight || !formData.height) return;
 
-    setAiLoading(true); // START LOADING
+    setAiLoading(true);
 
-    // Hitung umur bulan real-time saat submit
+    // A. Persiapan Data Input
     const birthDate = new Date(formData.dob);
-    const age = Math.max(0, differenceInMonths(new Date(), birthDate)); // Bulan
-
+    const today = new Date();
+    // Hitung umur bulan (cegah nilai negatif)
+    const age = Math.max(0, differenceInMonths(today, birthDate));
+    
     const height = parseFloat(formData.height);
     const weight = parseFloat(formData.weight);
+    const genderKey = (formData.gender === 'Laki-laki' || formData.gender === 'male') ? 'male' : 'female';
 
+    // B. Panggil Calculator Cerdas (Otomatis deteksi Balita/Anak/Dewasa)
+    const analysis = assessNutritionalStatus(age, weight, height, genderKey);
 
-    const medianHeight = (age * 0.7) + 60;
-    const stdDev = 3;
-
-    const zScoreVal = (height - medianHeight) / stdDev;
-    const zScoreFixed = parseFloat(zScoreVal.toFixed(1));
-
-    let status = 'Tumbuh Kembang Normal';
-    let isStunting = false;
-    let desc = 'Tinggi badan anak berada dalam rentang normal standar WHO.';
-
-    if (zScoreFixed < -2) {
-      status = 'Terindikasi Stunting';
-      isStunting = true;
-      desc = 'Tinggi badan anak berada di bawah rata-rata standar WHO.';
-    } else if (zScoreFixed > 2) {
-      status = 'Tinggi Diatas Rata-rata';
-      desc = 'Pertumbuhan anak sangat pesat diatas rata-rata.';
-    }
-
-    // Hitung BMI
-    // Rumus: Berat (kg) / (Tinggi (m) * Tinggi (m))
-    const heightInMeters = height / 100;
-    const bmiVal = weight / (heightInMeters * heightInMeters);
-    const bmiFixed = parseFloat(bmiVal.toFixed(1));
-
-    let bmiStatus = 'Normal';
-    if (bmiFixed < 18.5) bmiStatus = 'Kurus';
-    else if (bmiFixed >= 25) bmiStatus = 'Gemuk';
+    // C. Mapping Hasil ke UI State
+    // Menentukan apakah status "berbahaya" (Merah/Orange) atau "aman" (Hijau)
+    // Kita anggap aman jika warnanya hijau, selain itu warning.
+    const isWarning = analysis.color !== 'text-green-600';
 
     setResult({
-      zScore: zScoreFixed,
-      status: status,
-      description: desc,
-      isStunting: isStunting,
-      bmi: bmiFixed,
-      bmiStatus: bmiStatus
+      zScore: analysis.zScore || 0, // Dewasa mungkin tidak ada Z-Score
+      status: analysis.status,
+      // Gabungkan deskripsi dan saran medis agar tampil di kartu hasil
+      description: `${analysis.description} ${analysis.recommendation}`,
+      isStunting: isWarning, 
+      bmi: analysis.bmi,
+      // Jika kategori Balita, tampilkan kategori umurnya di label BMI
+      bmiStatus: analysis.category === 'Dewasa' ? analysis.status : analysis.category
     });
 
-    // --- AI GENERATION ---
+    // D. AI GENERATION (Prompt Diperbarui agar lebih spesifik)
     try {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const prompt = `Berikan 3 rekomendasi menu makanan lokal Indonesia yang murah dan bergizi untuk anak usia ${age} bulan dengan kondisi ${status} (Z-Score: ${zScoreFixed}) dan BMI ${bmiStatus}. 
-      Lokasi pengguna berada di daerah: ${userLocation || 'Indonesia'}. Sesuaikan bahan makanan dengan ketersediaan di daerah tersebut (misal: pesisir banyak ikan, pegunungan banyak sayur).
+      const prompt = `Berikan 3 rekomendasi menu makanan lokal Indonesia yang murah dan bergizi.
       
-      Format respon dalam JSON array seperti ini (tanpa markdown):
+      Profil Pengguna:
+      - Kategori: ${analysis.category}
+      - Usia: ${age} bulan
+      - Kondisi Kesehatan: ${analysis.status} (Z-Score: ${analysis.zScore || '-'})
+      - Berat: ${weight} kg, Tinggi: ${height} cm
+      - Saran Medis Awal: ${analysis.recommendation}
+      - Lokasi: ${userLocation || 'Indonesia'}
+      
+      Output HARUS JSON Array valid (tanpa markdown block):
       [
         {
           "name": "Nama Menu",
           "calories": 200,
           "protein": 10,
           "fats": 5,
-          "description": "Alasan singkat kenapa menu ini cocok (max 15 kata)."
+          "description": "Alasan kenapa menu ini cocok (max 15 kata)."
         }
       ]`;
 
@@ -235,24 +231,27 @@ export default function StuntingForm({
 
     setAiLoading(false);
 
-    // Save to Database if Child Exists
+    // E. Save to Database (Tetap jalan seperti semula)
     if (selectedChildId) {
       const supabase = createClient();
       console.log('Saving growth record...');
+      
+      // Kita simpan record meskipun mungkin logic DB belum punya kolom z_score
       const { error } = await supabase.from('growth_records').insert([
         {
           child_id: selectedChildId,
           age_in_months: age,
           height: height,
           weight: weight,
-          recorded_date: new Date().toISOString()
+          recorded_date: new Date().toISOString(),
+          // z_score: analysis.zScore (Bisa di-uncomment jika kolom DB sudah ada)
         }
       ]);
+      
       if (error) {
         console.error('Error saving growth record:', error);
         toast.error('Gagal menyimpan riwayat: ' + error.message);
       } else {
-        console.log('Growth record saved');
         toast.success('Riwayat pertumbuhan berhasil disimpan!');
         setCurrentGrowthRecord({
           child_id: selectedChildId,
@@ -274,7 +273,7 @@ export default function StuntingForm({
       {/* --- LEFT COLUMN: INPUT FORM --- */}
       <div className="w-full lg:w-1/3 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 h-fit sticky top-24">
 
-        {/* Child Selector (Only if logged in and has children) */}
+        {/* Child Selector */}
         {childrenData && childrenData.length > 0 && (
           <div className="mb-6 border-b border-gray-100 pb-6">
             <ChildSelector
@@ -329,6 +328,7 @@ export default function StuntingForm({
                 <span className="absolute left-3 top-3.5 text-gray-400 text-sm">⚖️</span>
                 <input
                   type="number"
+                  step="0.1"
                   className="w-full pl-9 p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
                   placeholder="11"
                   value={formData.weight}
@@ -343,6 +343,7 @@ export default function StuntingForm({
                 <span className="absolute left-3 top-3.5 text-gray-400 text-sm">📏</span>
                 <input
                   type="number"
+                  step="0.1"
                   className="w-full pl-9 p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
                   placeholder="70"
                   value={formData.height}
@@ -365,7 +366,7 @@ export default function StuntingForm({
       {/* --- RIGHT COLUMN: RESULTS & RECOMMENDATIONS --- */}
       <div className="w-full lg:w-2/3 space-y-6">
 
-        {/* 1. Result Card (Red/Green Box) */}
+        {/* 1. Result Card */}
         {aiLoading ? (
           <Skeleton className="h-48 w-full rounded-2xl" />
         ) : result ? (
@@ -376,16 +377,16 @@ export default function StuntingForm({
             <p className="text-gray-700 leading-relaxed text-lg">
               {result.description}
             </p>
-            <div className="mt-6 flex gap-4">
-              <div className="bg-white/60 p-3 rounded-lg flex-1">
-                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Z-Score</span>
+            <div className="mt-6 flex flex-wrap gap-4">
+              <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
+                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Z-Score / Index</span>
                 <p className="text-2xl font-black text-gray-800">{result.zScore}</p>
               </div>
-              <div className="bg-white/60 p-3 rounded-lg flex-1">
+              <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
                 <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Status</span>
-                <p className="text-xl font-bold text-gray-800">{result.status}</p>
+                <p className="text-lg font-bold text-gray-800 leading-tight">{result.status}</p>
               </div>
-              <div className="bg-white/60 p-3 rounded-lg flex-1">
+              <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
                 <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">BMI</span>
                 <p className="text-2xl font-black text-gray-800">{result.bmi}</p>
                 <p className="text-xs text-gray-600 font-medium">{result.bmiStatus}</p>
@@ -396,11 +397,11 @@ export default function StuntingForm({
           <EmptyState
             icon={Activity}
             title="Hasil Analisis"
-            description="Masukkan data si kecil dan tekan tombol Hitung untuk melihat hasil analisis status gizi."
+            description="Masukkan data si kecil dan tekan tombol Hitung untuk melihat hasil analisis status gizi berdasarkan standar WHO."
           />
         )}
 
-        {/* 2. Recommendations List (Card Style) */}
+        {/* 2. Recommendations List */}
         {result && (
           <div>
             <h3 className="font-bold text-gray-800 text-xl mb-4 flex items-center gap-2">
@@ -417,7 +418,6 @@ export default function StuntingForm({
                 {displayRecommendations.map((item, i) => (
                   <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                     <div className="relative h-32 w-full bg-gray-100 flex items-center justify-center text-4xl">
-                      {/* Gemini doesn't return images, so we use a placeholder or conditional */}
                       {item.image_url ? (
                         <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
@@ -425,7 +425,7 @@ export default function StuntingForm({
                       )}
                     </div>
                     <div className="p-4">
-                      <h4 className="font-bold text-md mb-3 text-gray-800">{item.name}</h4>
+                      <h4 className="font-bold text-md mb-3 text-gray-800 line-clamp-1">{item.name}</h4>
                       <div className="text-xs space-y-1 text-gray-500">
                         <div className="flex justify-between">
                           <span>{item.calories} Kal</span>
