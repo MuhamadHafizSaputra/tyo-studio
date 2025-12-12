@@ -21,6 +21,7 @@ const NavLinks = ({ user }: NavLinksProps) => {
         { name: 'Cek Si Kecil', path: '/cek-sikecil' },
         { name: 'Cek Nutrisi', path: '/cek-nutrisi' },
         { name: 'Track Si Kecil', path: '/track' },
+        { name: 'Artikel', path: '/artikel' },
     ];
 
     const handleLogout = async () => {
