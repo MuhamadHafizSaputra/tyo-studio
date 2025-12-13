@@ -1,45 +1,124 @@
+// src/components/Footer.tsx
+import React from 'react';
+import Link from 'next/link';
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from 'lucide-react';
+
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-gray-50 border-t border-gray-200 pt-16 pb-12">
-      <div className="container mx-auto px-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+    <footer className="relative bg-teal-50 pt-20 pb-10 mt-20">
+      
+      {/* ================= WAVE SECTION (PERBAIKAN) ================= */}
+      {/* Wave ini berwarna PUTIH (fill-white) dan diletakkan di paling atas footer (top-0).
+         Fungsinya menutupi bagian atas kotak footer agar terlihat melengkung.
+      */}
+      <div className="absolute top-0 left-0 w-full overflow-hidden leading-[0]">
+        <svg
+          data-name="Layer 1"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 1200 120"
+          preserveAspectRatio="none"
+          className="relative block w-[calc(100%+1.3px)] h-[60px] sm:h-[100px]"
+        >
+          <path
+            d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"
+            className="fill-gray-50" 
+          ></path>
+        </svg>
+      </div>
+      {/* ================= END WAVE ================= */}
 
-          {/* Brand Column */}
-          <div className="col-span-1 md:col-span-2 space-y-4">
-            <h4 className="text-2xl font-bold text-[var(--primary-color)]">TyoStudio</h4>
-            <p className="text-gray-500 leading-relaxed max-w-sm">
-              Platform pemantau tumbuh kembang anak terpercaya.
-              Membantu orang tua mencegah stunting dengan nutrisi yang tepat dan terukur.
+
+      <div className="container mx-auto px-6 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-10 pt-16">
+          
+          {/* 1. Brand & Deskripsi */}
+          <div className="space-y-6">
+            <h4 className="text-3xl font-bold text-[var(--primary-color)]">Teman Ibu</h4>
+            <p className="text-gray-600 leading-relaxed text-sm">
+              Sahabat terbaik Bunda dalam memantau tumbuh kembang si Kecil. 
+              Cegah stunting sejak dini dengan data akurat dan nutrisi tepat.
             </p>
+            <div className="flex gap-4 pt-2">
+              <SocialLink href="#" icon={<Instagram size={18} />} />
+              <SocialLink href="#" icon={<Facebook size={18} />} />
+              <SocialLink href="#" icon={<Twitter size={18} />} />
+            </div>
           </div>
 
-          {/* Links Column 1 */}
+          {/* 2. Layanan */}
           <div>
-            <h4 className="font-bold text-gray-900 mb-6">Tentang Kami</h4>
-            <ul className="space-y-4 text-gray-600">
-              <li><a href="#" className="hover:text-[var(--primary-color)] transition-colors">Visi & Misi</a></li>
-              <li><a href="#" className="hover:text-[var(--primary-color)] transition-colors">Tim Kami</a></li>
-              <li><a href="#" className="hover:text-[var(--primary-color)] transition-colors">Kontak</a></li>
+            <h4 className="text-lg font-bold text-teal-800 mb-6">
+              Layanan Kami
+            </h4>
+            <ul className="space-y-3 text-sm text-gray-600">
+              <li><FooterLink href="/cek-sikecil">Cek Status Gizi</FooterLink></li>
+              <li><FooterLink href="/cek-nutrisi">Kalkulator Nutrisi</FooterLink></li>
+              <li><FooterLink href="/track">Grafik Pertumbuhan</FooterLink></li>
+              <li><FooterLink href="/artikel">Artikel Parenting</FooterLink></li>
             </ul>
           </div>
 
-          {/* Links Column 2 */}
+          {/* 3. Tentang */}
           <div>
-            <h4 className="font-bold text-gray-900 mb-6">Layanan</h4>
-            <ul className="space-y-4 text-gray-600">
-              <li><a href="#" className="hover:text-[var(--primary-color)] transition-colors">Cek Status Gizi</a></li>
-              <li><a href="#" className="hover:text-[var(--primary-color)] transition-colors">Rekomendasi Menu</a></li>
-              <li><a href="#" className="hover:text-[var(--primary-color)] transition-colors">Konsultasi Ahli</a></li>
+            <h4 className="text-lg font-bold text-teal-800 mb-6">
+              Tentang
+            </h4>
+            <ul className="space-y-3 text-sm text-gray-600">
+              <li><FooterLink href="#">Tentang Kami</FooterLink></li>
+              <li><FooterLink href="#">Tim Ahli</FooterLink></li>
+              <li><FooterLink href="#">Kebijakan Privasi</FooterLink></li>
+              <li><FooterLink href="#">Syarat & Ketentuan</FooterLink></li>
+            </ul>
+          </div>
+
+          {/* 4. Kontak */}
+          <div>
+            <h4 className="text-lg font-bold text-teal-800 mb-6">
+              Hubungi Kami
+            </h4>
+            <ul className="space-y-4 text-sm text-gray-600">
+              <li className="flex items-center gap-3">
+                <Phone className="text-[var(--primary-color)] shrink-0" size={18} />
+                <span>+62 897-3869-447</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <Mail className="text-[var(--primary-color)] shrink-0" size={18} />
+                <span>halo@temanibu.com</span>
+              </li>
             </ul>
           </div>
         </div>
 
-        <div className="border-t border-gray-200 mt-16 pt-8 text-center text-gray-500 text-sm">
-          &copy; {new Date().getFullYear()} TyoStudio. All rights reserved.
+        {/* Copyright & Credit */}
+        <div className="border-t border-teal-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+          <p>&copy; {new Date().getFullYear()} Teman Ibu. All rights reserved.</p>
+          <p className="flex items-center gap-1">
+            Dibuat dengan <span className="text-red-400">❤</span> untuk anak Indonesia
+          </p>
         </div>
       </div>
     </footer>
   );
 };
+
+// Komponen Link dengan Hover Effect Halus
+const FooterLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
+  <Link 
+    href={href} 
+    className="hover:text-[var(--primary-color)] hover:translate-x-1 transition-all duration-300 inline-block"
+  >
+    {children}
+  </Link>
+);
+
+// Komponen Social Media dengan Background Putih (Soft Look)
+const SocialLink = ({ href, icon }: { href: string; icon: React.ReactNode }) => (
+  <a 
+    href={href} 
+    className="w-9 h-9 rounded-full bg-white border border-teal-100 flex items-center justify-center text-teal-600 hover:bg-[var(--primary-color)] hover:text-white hover:border-[var(--primary-color)] transition-all duration-300 shadow-sm hover:shadow-md"
+  >
+    {icon}
+  </a>
+);
 
 export default Footer;

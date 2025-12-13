@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
@@ -11,12 +11,15 @@ import AddGrowthRecordModal from './AddGrowthRecordModal';
 import { ClipboardList, PlusCircle, Trash2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
+import { generateFoodRecommendations } from '@/app/actions/gemini';
+import { Loader2, MapPin, Sparkles } from 'lucide-react';
 
 interface TrackerDashboardProps {
   user: any;
   child: any;
   allChildren?: any[];
   growthRecords: any[];
+  userLocation?: string;
 }
 
 // --- DATA STANDARD WHO (Simplified for Demo) ---
@@ -83,10 +86,17 @@ const CustomTooltip = ({ active, payload, label, mode }: any) => {
   return null;
 };
 
-export default function TrackerDashboard({ user, child, allChildren, growthRecords }: TrackerDashboardProps) {
+export default function TrackerDashboard({ user, child, allChildren, growthRecords, userLocation = 'Indonesia' }: TrackerDashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'height' | 'weight' | 'zscore'>('height');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Recommendations State
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
+  const [errorRecs, setErrorRecs] = useState<string | null>(null);
+  const fetchingRef = React.useRef(false);
 
   // Handle Child Switch
   const handleChildSelect = (childId: string) => {
@@ -95,57 +105,155 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     router.push(`/track?childId=${childId}`);
   };
 
-  // Handle Delete Record
-  const handleDeleteRecord = async (recordId: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data pengukuran ini?')) {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('growth_records')
-        .delete()
-        .eq('id', recordId);
+  const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
 
-      if (error) {
-        toast.error('Gagal menghapus data: ' + error.message);
-      } else {
-        toast.success('Data pengukuran berhasil dihapus');
-        router.refresh();
-      }
-    }
+  // Handle Delete Request
+  const handleDeleteRequest = (recordId: string) => {
+    setDeleteRecordId(recordId);
   };
 
-  // Merge Standard Data with User Data
+  // Confirm Delete
+  const confirmDelete = async () => {
+    if (!deleteRecordId) return;
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('growth_records')
+      .delete()
+      .eq('id', deleteRecordId);
+
+    if (error) {
+      toast.error('Gagal menghapus data: ' + error.message);
+    } else {
+      toast.success('Data pengukuran berhasil dihapus');
+      router.refresh();
+    }
+    setDeleteRecordId(null);
+  };
+
+  // Internal Generation Function
+  const generateRecommendations = async () => {
+    if (!child) return;
+
+    // Use the latest data for context
+    const lastRecord = growthRecords[growthRecords.length - 1];
+
+    if (!lastRecord) return;
+
+    setLoadingRecs(true);
+    setErrorRecs(null);
+
+    // Calculate Age
+    const currentAge = lastRecord.age_in_months;
+    const currentWeight = lastRecord.weight;
+    const currentHeight = lastRecord.height;
+
+    // Determine Status (Simplified)
+    const zScoreVal = chartData.findLast(d => d.heightChild !== null)?.zScore || 0;
+
+    let statusString = 'Normal';
+    if (zScoreVal < -2) statusString = 'Stunting / Gizi Kurang';
+    if (zScoreVal > 2) statusString = 'Gizi Lebih';
+
+    const res = await generateFoodRecommendations(
+      currentAge,
+      currentWeight,
+      currentHeight,
+      child.gender,
+      statusString,
+      userLocation,
+      child.id
+    );
+
+    if (res.error) {
+      setErrorRecs(res.error);
+      toast.error(res.error);
+    } else if (res.recommendations) {
+      setRecommendations(res.recommendations);
+      setHasGenerated(true);
+      if (res.isFallback) {
+        toast.info('Info: Limit API tercapai. Menggunakan mode offline.');
+      } else {
+        if (!res.suppressNotification) {
+          toast.success('Rekomendasi menu berhasil dibuat!');
+        }
+      }
+    }
+
+    setLoadingRecs(false);
+  };
+
+  // Auto-generate on mount or child change
+  useEffect(() => {
+    // Reset fetching ref when dependencies change effectively (new child)
+    // But we need to be careful. Let's just rely on the conditions.
+
+    if (child && growthRecords.length > 0 && recommendations.length === 0 && !hasGenerated && !loadingRecs && !errorRecs) {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+
+      generateRecommendations().finally(() => {
+        fetchingRef.current = false;
+      });
+    }
+  }, [child?.id, growthRecords.length]);
+
+  // Expose for retry button
+  const handleRetry = () => generateRecommendations();
+
+  // Merge User Data with Standard Data (interpolated for smoothness)
   const chartData = useMemo(() => {
-    // Map records by month (buckets)
-    const recordsMap = new Map();
-    growthRecords.forEach(r => {
-      // Simple bucketing to nearest 6 months or exact match?
-      // Let's bucket by closest standard point for demo visualization
-      // Or better: Just use age_in_months
-      const bucket = standardData.reduce((prev, curr) =>
-        Math.abs(curr.month - r.age_in_months) < Math.abs(prev.month - r.age_in_months) ? curr : prev
-      ).month;
+    // 1. Get all unique months to plot (Standard points + User points)
+    // Actually, generating a continuous monthly series is better for the X-Axis scale
+    const maxUserMonth = growthRecords.length > 0 ? Math.max(...growthRecords.map(r => r.age_in_months)) : 0;
+    const maxMonth = Math.max(36, maxUserMonth + 1); // At least up to 36 months
 
-      // If exact match or close enough, user data overrides
-      recordsMap.set(bucket, r);
-    });
+    const data = [];
 
-    return standardData.map(std => {
-      const rec = recordsMap.get(std.month);
-      // Calculate naive Z-Score if record exists
-      let zScore = null;
-      if (rec) {
-        // Very rough approx
-        zScore = ((rec.height - std.heightIdeal) / 3).toFixed(1);
+    for (let m = 0; m <= maxMonth; m++) {
+      // Linear Interpolation for Standard Data
+      // Find indices in standardData
+      const lower = standardData.filter(d => d.month <= m).pop() || standardData[0];
+      const upper = standardData.find(d => d.month >= m) || standardData[standardData.length - 1];
+
+      let fraction = 0;
+      if (upper.month !== lower.month) {
+        fraction = (m - lower.month) / (upper.month - lower.month);
       }
 
-      return {
-        age: `${std.month} Bln`,
-        heightChild: rec ? rec.height : null,
-        weightChild: rec ? rec.weight : null,
-        zScore: zScore ? parseFloat(zScore) : null,
-        ...std
+      const lerp = (start: number, end: number) => start + (end - start) * fraction;
+
+      const stdPoint = {
+        heightIdeal: parseFloat(lerp(lower.heightIdeal, upper.heightIdeal).toFixed(1)),
+        heightBorder: parseFloat(lerp(lower.heightBorder, upper.heightBorder).toFixed(1)), // Stunting border
+        weightIdeal: parseFloat(lerp(lower.weightIdeal, upper.weightIdeal).toFixed(1)),
+        weightBorder: parseFloat(lerp(lower.weightBorder, upper.weightBorder).toFixed(1)), // Underweight border
       };
-    });
+
+      // Find exact user record for this month (if any)
+      // If multiple records in same month, take the last one (or average?) -> taking last seems reasonable
+      const userRec = growthRecords.find(r => Math.round(r.age_in_months) === m);
+
+      let zScore = null;
+      if (userRec) {
+        // Rough Z-Score Check
+        zScore = ((userRec.height - stdPoint.heightIdeal) / 3).toFixed(1);
+      }
+
+      data.push({
+        age: m, // numeric for XAxis type="number" if needed, or string "X Bln"
+        label: `${m} Bln`,
+        heightIdeal: stdPoint.heightIdeal,
+        heightBorder: stdPoint.heightBorder,
+        weightIdeal: stdPoint.weightIdeal,
+        weightBorder: stdPoint.weightBorder,
+        heightChild: userRec ? userRec.height : null,
+        weightChild: userRec ? userRec.weight : null,
+        zScore: zScore ? parseFloat(zScore) : null,
+      });
+    }
+
+    return data;
   }, [growthRecords]);
 
   // Latest Record for Summary
@@ -168,7 +276,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase tracking-wide">{child?.gender || '-'}</span>
               {child?.date_of_birth && (
                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  🎂 {new Date(child.date_of_birth).toLocaleDateString()}
+                  🎂 {new Date(child.date_of_birth).toLocaleDateString('id-ID')}
                 </span>
               )}
             </div>
@@ -234,7 +342,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="age" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} interval="preserveStartEnd" minTickGap={30} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dx={-10} />
                   <Tooltip content={<CustomTooltip mode={activeTab} />} cursor={{ stroke: '#E5E7EB', strokeWidth: 2 }} />
 
@@ -314,61 +422,81 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         {/* --- AREA KANAN (MENU REKOMENDASI) --- */}
         <div className="h-full">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col max-h-[500px]">
-            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50 shrink-0">
-              🍽️ Menu Rekomendasi
-            </h3>
+            <div className="flex justify-between items-center mb-5 border-b border-gray-50 pb-2 shrink-0">
+              <h3 className="font-bold text-gray-800 text-sm tracking-widest uppercase">
+                🍽️ Menu Rekomendasi
+              </h3>
+              {userLocation && (
+                <div className="flex items-center gap-1 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded-full">
+                  <MapPin size={12} />
+                  <span className="font-bold truncate max-w-[100px]">{userLocation}</span>
+                </div>
+              )}
+            </div>
 
             <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🐟</span>
+              {/* Empty State / Initial Loading if no records */}
+              {!loadingRecs && !errorRecs && recommendations.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center p-4 opacity-70">
+                  <div className="text-3xl mb-2 grayscale">🥘</div>
+                  <p className="text-xs text-gray-500 max-w-[200px] leading-relaxed">
+                    {growthRecords.length === 0
+                      ? "Catat data tumbuh kembang dulu untuk dapat rekomendasi."
+                      : "Menyiapkan rekomendasi menu..."}
+                  </p>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Ikan Kembung Kuah Asam</h4>
-                  <p className="text-xs text-gray-500 mt-1">Mengandung Omega-3 tinggi untuk perkembangan otak & protein.</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥛</span>
+              {/* Error State */}
+              {errorRecs && (
+                <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                  <div className="text-3xl mb-2">⚠️</div>
+                  <p className="text-xs text-red-500 mb-4 max-w-[200px]">
+                    {errorRecs || "Gagal memuat rekomendasi."}
+                  </p>
+                  <button
+                    onClick={handleRetry}
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition"
+                  >
+                    Coba Lagi
+                  </button>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Susu Tinggi Kalori</h4>
-                  <p className="text-xs text-gray-500 mt-1">Tambahan 2 gelas sehari untuk mengejar berat badan.</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥑</span>
+              {(loadingRecs || (recommendations.length === 0 && !hasGenerated && !errorRecs && growthRecords.length > 0)) && ( /* Skeleton Loading */
+                <div className="space-y-4 animate-pulse">
+                  <div className="flex gap-2 items-center text-teal-600 text-xs font-bold mb-2">
+                    <Sparkles size={14} className="animate-spin" />
+                    Sedang meracik menu untuk si kecil...
+                  </div>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex gap-4 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="w-12 h-12 bg-gray-200 rounded-lg shrink-0"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Alpukat Kerok Susu</h4>
-                  <p className="text-xs text-gray-500 mt-1">Lemak sehat tinggi kalori yang mudah dicerna balita.</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥩</span>
+              {recommendations.map((item, idx) => (
+                <div key={idx} className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100 animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                  <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-lg flex items-center justify-center text-2xl shrink-0 shadow-sm border border-orange-100">
+                    {idx === 0 ? '🍳' : idx === 1 ? '🍱' : idx === 2 ? '🥗' : '🥣'}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.description}</p>
+                    <div className="flex gap-2 mt-2">
+                      <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-bold border border-orange-100">🔥 {item.calories} kkal</span>
+                      <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">💪 P: {item.protein}g</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Bola Daging Cincang</h4>
-                  <p className="text-xs text-gray-500 mt-1">Sumber zat besi dan protein hewani yang sangat baik.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥣</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Bubur Kacang Hijau</h4>
-                  <p className="text-xs text-gray-500 mt-1">Snack sehat kaya serat dan vitamin B kompleks.</p>
-                </div>
-              </div>
+              ))}
 
             </div>
           </div>
@@ -399,7 +527,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                     <td className="px-4 py-3 text-orange-400 font-bold">{record.weight}</td>
                     <td className="px-4 py-3 text-center">
                       <button
-                        onClick={() => handleDeleteRecord(record.id)}
+                        onClick={() => handleDeleteRequest(record.id)}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
                         title="Hapus Data"
                       >
@@ -410,6 +538,44 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteRecordId && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl transform transition-all scale-100">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Hapus Data?</h3>
+              <button
+                onClick={() => setDeleteRecordId(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 18 18" /></svg>
+              </button>
+            </div>
+
+            <p className="text-gray-600 mb-6 text-sm leading-relaxed">
+              Apakah Bunda yakin ingin menghapus data pengukuran ini?
+              <br /><br />
+              <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded">⚠️ Data yang dihapus tidak dapat dikembalikan.</span>
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteRecordId(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition text-sm"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition shadow-md text-sm"
+              >
+                Ya, Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

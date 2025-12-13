@@ -4,12 +4,16 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
+  --background: oklch(0.985 0.002 247.839);
   --foreground: #171717;
   --primary-color: #00b894;
   /* Warna Hijau Tosca Utama */
   --secondary-color: #ff7675;
   /* Warna Pink/Salmon */
+}
+
+body {
+  background-color: var(--background);
 }
 
 /* Animasi sederhana untuk hasil */
