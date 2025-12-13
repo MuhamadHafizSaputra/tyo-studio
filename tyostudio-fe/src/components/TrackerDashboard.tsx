@@ -204,9 +204,10 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         </div>
 
         {/* Child Selector & Add Button */}
-        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-end"> 
+          {/* Child Selector */}
           {allChildren && allChildren.length > 0 && (
-            <div className="w-full md:w-64">
+            <div className="w-full md:w-56">
               <ChildSelector
                 childrenData={allChildren}
                 selectedId={child?.id}
@@ -219,10 +220,10 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
           {child && (
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex justify-center items-center gap-2 px-6 py-3 bg-[var(--primary-color)] text-white font-bold rounded-xl shadow-lg shadow-teal-100 hover:bg-teal-700 transition"
+              className="h-[50px] flex justify-center items-center gap-2 px-5 bg-[var(--primary-color)] text-white font-bold text-sm rounded-xl shadow-sm hover:bg-teal-700 hover:shadow-md transition-all mb-[1px] min-w-[140px]" 
             >
-              <PlusCircle size={20} />
-              Catat Data
+              <PlusCircle size={18} strokeWidth={2.5} />
+              <span>Catat Data</span>
             </button>
           )}
         </div>
