@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
@@ -8,9 +8,12 @@ import { useRouter } from 'next/navigation';
 import ChildSelector from './ChildSelector';
 import { EmptyState } from '@/components/ui/EmptyState';
 import AddGrowthRecordModal from './AddGrowthRecordModal';
-import { ClipboardList, PlusCircle, Trash2 } from 'lucide-react';
+import { ClipboardList, PlusCircle, Trash2, Loader2 } from 'lucide-react'; // Tambah Loader2
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
+
+// IMPORT SERVER ACTION UNTUK AI
+import { generateFoodRecommendations } from '@/app/actions/gemini';
 
 interface TrackerDashboardProps {
   user: any;
@@ -88,10 +91,12 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
   const [activeTab, setActiveTab] = useState<'height' | 'weight' | 'zscore'>('height');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
+  // STATE UNTUK AI
+  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
+  const [loadingAi, setLoadingAi] = useState(false);
+
   // Handle Child Switch
   const handleChildSelect = (childId: string) => {
-    // Navigate to same page but with new childId query param
-    // This triggers SSR re-fetch in page.tsx
     router.push(`/track?childId=${childId}`);
   };
 
@@ -115,26 +120,18 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
   // Merge Standard Data with User Data
   const chartData = useMemo(() => {
-    // Map records by month (buckets)
     const recordsMap = new Map();
     growthRecords.forEach(r => {
-      // Simple bucketing to nearest 6 months or exact match?
-      // Let's bucket by closest standard point for demo visualization
-      // Or better: Just use age_in_months
       const bucket = standardData.reduce((prev, curr) =>
         Math.abs(curr.month - r.age_in_months) < Math.abs(prev.month - r.age_in_months) ? curr : prev
       ).month;
-
-      // If exact match or close enough, user data overrides
       recordsMap.set(bucket, r);
     });
 
     return standardData.map(std => {
       const rec = recordsMap.get(std.month);
-      // Calculate naive Z-Score if record exists
       let zScore = null;
       if (rec) {
-        // Very rough approx
         zScore = ((rec.height - std.heightIdeal) / 3).toFixed(1);
       }
 
@@ -148,12 +145,43 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     });
   }, [growthRecords]);
 
-  // Latest Record for Summary
-  const currentStatus = chartData.findLast(d => d.heightChild !== null) || chartData[0];
+  // --- EFEK BARU: GENERATE AI RECOMMENDATION SAAT DATA BERUBAH ---
+  useEffect(() => {
+    const fetchAiAdvice = async () => {
+      // Ambil record terakhir (paling baru)
+      // Asumsi growthRecords sudah di-sort ascending di page.tsx, jadi ambil yang terakhir
+      const lastRecord = growthRecords.length > 0 ? growthRecords[growthRecords.length - 1] : null;
+      
+      if (!child || !lastRecord) return;
 
-  // History Logs (Reverse Chronological) - Get last 5
-  // growthRecords is ascending, so we simply reverse copy
-  const historyLogs = [...growthRecords].reverse().slice(0, 5);
+      setLoadingAi(true);
+      try {
+        // Tentukan status sederhana untuk prompt
+        let statusSimpel = 'Normal';
+        if (lastRecord.weight < 10 && lastRecord.age_in_months > 12) statusSimpel = 'Berat Kurang';
+        if (lastRecord.height < 70 && lastRecord.age_in_months > 12) statusSimpel = 'Pendek (Stunting)';
+
+        const res = await generateFoodRecommendations(
+          lastRecord.age_in_months,
+          lastRecord.weight,
+          lastRecord.height,
+          child.gender || 'male',
+          statusSimpel
+        );
+
+        if (res.recommendations && res.recommendations.length > 0) {
+          setAiRecommendations(res.recommendations);
+        }
+      } catch (e) {
+        console.error(e);
+        toast.error("Gagal memuat rekomendasi AI");
+      } finally {
+        setLoadingAi(false);
+      }
+    };
+
+    fetchAiAdvice();
+  }, [growthRecords, child]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -311,64 +339,60 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
           </div>
         </div>
 
-        {/* --- AREA KANAN (MENU REKOMENDASI) --- */}
+        {/* --- AREA KANAN (MENU REKOMENDASI AI) --- */}
         <div className="h-full">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col max-h-[500px]">
-            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50 shrink-0">
-              🍽️ Menu Rekomendasi
-            </h3>
+            <div className="flex items-center justify-between mb-5 border-b pb-2 border-gray-50 shrink-0">
+                <h3 className="font-bold text-gray-800 text-sm tracking-widest uppercase flex items-center gap-2">
+                  <span>🍽️</span> Menu Rekomendasi
+                </h3>
+                {/* Badge AI */}
+                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full border border-indigo-100 font-bold">
+                    Gemini AI
+                </span>
+            </div>
 
             <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+              
+              {/* STATE 1: LOADING */}
+              {loadingAi && (
+                <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
+                    <Loader2 className="animate-spin" size={24} />
+                    <p className="text-xs">Meracik menu untuk {child?.name}...</p>
+                </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🐟</span>
+              {/* STATE 2: EMPTY (BELUM ADA RECORD) */}
+              {!loadingAi && aiRecommendations.length === 0 && (
+                <div className="text-center py-10 text-gray-400 text-sm">
+                    <p>Belum ada data rekomendasi.</p>
+                    <p className="text-xs mt-1">Pastikan data pertumbuhan sudah tercatat.</p>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Ikan Kembung Kuah Asam</h4>
-                  <p className="text-xs text-gray-500 mt-1">Mengandung Omega-3 tinggi untuk perkembangan otak & protein.</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥛</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Susu Tinggi Kalori</h4>
-                  <p className="text-xs text-gray-500 mt-1">Tambahan 2 gelas sehari untuk mengejar berat badan.</p>
-                </div>
-              </div>
+              {/* STATE 3: SUKSES (LOOPING DATA DARI AI) */}
+              {!loadingAi && aiRecommendations.map((item, idx) => {
+                 // Variasi warna icon background
+                 const colors = ['bg-orange-100 text-orange-600', 'bg-green-100 text-green-600', 'bg-yellow-100 text-yellow-600', 'bg-blue-100 text-blue-600'];
+                 const iconColor = colors[idx % colors.length];
+                 const icons = ['🍲', '🥗', '🥣', '🐟']; // Icon random
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥑</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Alpukat Kerok Susu</h4>
-                  <p className="text-xs text-gray-500 mt-1">Lemak sehat tinggi kalori yang mudah dicerna balita.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥩</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Bola Daging Cincang</h4>
-                  <p className="text-xs text-gray-500 mt-1">Sumber zat besi dan protein hewani yang sangat baik.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥣</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Bubur Kacang Hijau</h4>
-                  <p className="text-xs text-gray-500 mt-1">Snack sehat kaya serat dan vitamin B kompleks.</p>
-                </div>
-              </div>
+                 return (
+                    <div key={idx} className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
+                        <div className={`w-12 h-12 ${iconColor} rounded-lg flex items-center justify-center text-2xl shrink-0`}>
+                        <span>{icons[idx % icons.length]}</span>
+                        </div>
+                        <div>
+                        <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
+                        <div className="flex gap-2 text-[10px] text-gray-500 mt-1 font-mono">
+                            <span className="bg-gray-100 px-1 rounded">{item.calories} kkal</span>
+                            <span className="bg-gray-100 px-1 rounded">P: {item.protein}g</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+                        </div>
+                    </div>
+                 )
+              })}
 
             </div>
           </div>

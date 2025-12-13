@@ -158,7 +158,7 @@ export default function CekNutrisiPage() {
                     <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-10">
                         <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                             🍽️ Input Makanan
-                            <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Ketik nama makanan (cth: Nasi Putih, Ayam Goreng)</span>
+                            <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Ketik nama makanan (cth: Bubur Nasi, Pisang)</span>
                         </h3>
 
                         <div className="space-y-4">

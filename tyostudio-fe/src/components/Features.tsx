@@ -11,9 +11,9 @@ const Features: React.FC = () => {
       desc: "Perhitungan BMI dan deteksi risiko stunting menggunakan standar kurva pertumbuhan resmi dari WHO."
     },
     {
-      icon: "🥗",
-      title: "Saran Nutrisi Harian",
-      desc: "Dapatkan rekomendasi resep dan bahan makanan yang disesuaikan dengan kebutuhan kalori anak."
+      icon: "🤖",
+      title: "Rekomendasi Berbasis AI",
+      desc: "Teknologi AI pintar yang meracik menu harian spesifik berdasarkan usia, berat, dan kondisi kesehatan anak Anda."
     },
     {
       icon: "📝",

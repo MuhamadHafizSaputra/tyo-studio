@@ -20,11 +20,11 @@ export async function generateFoodRecommendations(
     };
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `
     Bertindaklah sebagai ahli gizi anak profesional.
-    Buatlah 4 rekomendasi menu makanan spesifik (sarapan, makan siang, makan malam, camilan) untuk anak dengan data berikut:
+    Buatlah 6 rekomendasi menu makanan spesifik khusus untuk balita dan anak (sarapan, makan siang, makan malam, camilan) untuk anak dengan data berikut:
     - Umur: ${age} bulan
     - Berat: ${weight} kg
     - Tinggi: ${height} cm
