@@ -9,7 +9,24 @@ import {
   Users, GraduationCap, Leaf, LayoutGrid, Stethoscope,
   SlidersHorizontal, X, Sparkles
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { articlesData } from '@/data/articles';
+
+// Animation Variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
 
 export default function ArtikelPage() {
   // --- STATE ---
@@ -57,24 +74,49 @@ export default function ArtikelPage() {
       <div className="bg-white pt-16 pb-12 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] border-b border-gray-100 relative overflow-hidden">
 
         {/* Dekorasi Background Gradient Halus */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-teal-50/60 to-transparent rounded-full blur-3xl -z-10 pointer-events-none"></div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-teal-50/60 to-transparent rounded-full blur-3xl -z-10 pointer-events-none"
+        />
 
         <div className="container mx-auto max-w-4xl px-4 text-center relative z-10">
 
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-[10px] font-bold tracking-widest uppercase border border-teal-100 mb-6">
+          <motion.span
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-[10px] font-bold tracking-widest uppercase border border-teal-100 mb-6"
+          >
             <Sparkles size={12} /> Pusat Edukasi
-          </span>
+          </motion.span>
 
-          <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-6 leading-[1.2] tracking-tight">
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.7 }}
+            className="text-4xl md:text-5xl font-black text-gray-900 mb-6 leading-[1.2] tracking-tight"
+          >
             Panduan Tumbuh Kembang <br className="hidden md:block" /> & Nutrisi Si Kecil
-          </h1>
+          </motion.h1>
 
-          <p className="text-gray-500 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-10 font-light">
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-gray-500 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-10 font-light"
+          >
             Temukan ribuan artikel terpercaya, resep MPASI, dan tips kesehatan untuk mencegah stunting sejak dini.
-          </p>
+          </motion.p>
 
           {/* Search Bar Besar di Tengah */}
-          <div className="relative max-w-xl mx-auto group">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5, type: "spring", stiffness: 100 }}
+            className="relative max-w-xl mx-auto group"
+          >
             <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
               <Search className="text-gray-400 group-focus-within:text-[var(--primary-color)] transition-colors" size={24} />
             </div>
@@ -85,7 +127,7 @@ export default function ArtikelPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-          </div>
+          </motion.div>
         </div>
       </div>
 
@@ -93,7 +135,12 @@ export default function ArtikelPage() {
       <div className="container mx-auto max-w-6xl px-4 md:px-8 py-10">
 
         {/* --- STICKY FLOATING FILTER BAR --- */}
-        <div className="sticky top-4 z-30 mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="sticky top-4 z-30 mb-8"
+        >
           <div className="bg-white/80 backdrop-blur-xl p-3 rounded-2xl shadow-lg shadow-gray-200/50 border border-white/50 flex flex-wrap items-center justify-between gap-4">
 
             {/* Info Hasil */}
@@ -111,8 +158,8 @@ export default function ArtikelPage() {
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border shadow-sm ${isFilterOpen || activeCategory !== 'Semua'
-                  ? 'bg-teal-50 text-teal-700 border-teal-200'
-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                ? 'bg-teal-50 text-teal-700 border-teal-200'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                 }`}
             >
               {isFilterOpen ? <X size={18} strokeWidth={2.5} /> : <SlidersHorizontal size={18} strokeWidth={2.5} />}
@@ -121,112 +168,145 @@ export default function ArtikelPage() {
           </div>
 
           {/* --- DROPDOWN KATEGORI --- */}
-          <div className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isFilterOpen ? 'max-h-[300px] opacity-100 mt-3' : 'max-h-0 opacity-0 mt-0'}`}>
-            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl shadow-gray-100">
-              <p className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider ml-1">Pilih Kategori Spesifik:</p>
+          <AnimatePresence>
+            {isFilterOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                animate={{ height: "auto", opacity: 1, marginTop: 12 }}
+                exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl shadow-gray-100">
+                  <p className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider ml-1">Pilih Kategori Spesifik:</p>
 
-              <div className="relative w-full">
-                <div className="flex flex-wrap gap-3">
-                  {categories.map((cat) => {
-                    const config = getCategoryConfig(cat);
-                    const isActive = activeCategory === cat;
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => { setActiveCategory(cat); }} // Tetap buka atau tutup sesuai preferensi UX
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border select-none ${isActive
-                            ? 'bg-[var(--primary-color)] text-white border-[var(--primary-color)] shadow-md shadow-teal-200 transform scale-105'
-                            : 'bg-gray-50 text-gray-600 border-gray-100 hover:border-teal-200 hover:bg-teal-50'
-                          }`}
-                      >
-                        <span className={`flex items-center justify-center w-6 h-6 rounded-full ${isActive ? 'bg-white/20' : config.color.split(' ')[0]}`}>
-                          {React.cloneElement(config.icon as React.ReactElement, {
-                            size: 14,
-                            className: isActive ? 'text-white' : config.color.split(' ')[1].replace('text-', 'text-')
-                          })}
-                        </span>
-                        {cat}
-                      </button>
-                    );
-                  })}
+                  <div className="relative w-full">
+                    <div className="flex flex-wrap gap-3">
+                      {categories.map((cat, index) => {
+                        const config = getCategoryConfig(cat);
+                        const isActive = activeCategory === cat;
+                        return (
+                          <motion.button
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.05 }}
+                            key={cat}
+                            onClick={() => { setActiveCategory(cat); }} // Tetap buka atau tutup sesuai preferensi UX
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border select-none ${isActive
+                              ? 'bg-[var(--primary-color)] text-white border-[var(--primary-color)] shadow-md shadow-teal-200 transform scale-105'
+                              : 'bg-gray-50 text-gray-600 border-gray-100 hover:border-teal-200 hover:bg-teal-50'
+                              }`}
+                          >
+                            <span className={`flex items-center justify-center w-6 h-6 rounded-full ${isActive ? 'bg-white/20' : config.color.split(' ')[0]}`}>
+                              {React.cloneElement(config.icon as React.ReactElement, {
+                                size: 14,
+                                className: isActive ? 'text-white' : config.color.split(' ')[1].replace('text-', 'text-')
+                              })}
+                            </span>
+                            {cat}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
 
         {/* --- GRID ARTIKEL --- */}
         {filteredArticles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredArticles.map((article) => (
-              <Link
-                href={`/artikel/${article.id}`}
-                key={article.id}
-                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', MozBackfaceVisibility: 'hidden' }}
-                className="group bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-[0_2px_20px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.06)] hover:-translate-y-2 transition-all duration-500 flex flex-col h-full transform-gpu"
-              >
-                {/* Image Area */}
-                <div className="relative h-60 overflow-hidden">
-                  {/* BAGIAN YANG DIHAPUS: Div animate-pulse di sini telah dihilangkan */}
-                  <Image
-                    src={article.image}
-                    alt={article.title}
-                    width={800}
-                    height={600}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
-                  {/* Glassmorphism Badge */}
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-bold text-gray-800 shadow-sm flex items-center gap-1.5 border border-white/40">
-                      {getCategoryConfig(article.category).icon}
-                      {article.category}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Content Area */}
-                <div className="p-6 flex flex-col flex-grow relative">
-                  {/* Decorative Line */}
-                  <div className="absolute top-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-gray-100 to-transparent"></div>
-
-                  <div className="flex items-center gap-3 text-[11px] text-gray-400 mb-3 font-semibold uppercase tracking-wider">
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} className="text-[var(--primary-color)]" /> {article.readTime}
-                    </span>
-                    <span className="text-gray-300">•</span>
-                    <span>{article.date}</span>
-                  </div>
-
-                  <h3 className="text-xl font-bold text-gray-800 mb-3 line-clamp-2 leading-snug group-hover:text-[var(--primary-color)] transition-colors">
-                    {article.title}
-                  </h3>
-
-                  <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 mb-6 flex-grow font-light">
-                    {article.excerpt}
-                  </p>
-
-                  <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 border border-gray-100 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
-                        <User size={14} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-400 font-bold uppercase">Penulis</span>
-                        <span className="text-xs font-bold text-gray-700 truncate max-w-[100px]">{article.author}</span>
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          >
+            <AnimatePresence mode='popLayout'>
+              {filteredArticles.map((article) => (
+                <motion.div
+                  key={article.id}
+                  variants={fadeInUp}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Link
+                    href={`/artikel/${article.id}`}
+                    style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', MozBackfaceVisibility: 'hidden' }}
+                    className="group bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-[0_2px_20px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.06)] hover:-translate-y-2 transition-all duration-500 flex flex-col h-full transform-gpu isolate"
+                  >
+                    {/* Image Area */}
+                    <div className="relative h-60 overflow-hidden rounded-t-[2rem]">
+                      {/* BAGIAN YANG DIHAPUS: Div animate-pulse di sini telah dihilangkan */}
+                      <Image
+                        src={article.image}
+                        alt={article.title}
+                        width={800}
+                        height={600}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      {/* Glassmorphism Badge */}
+                      <div className="absolute top-4 left-4">
+                        <span className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-bold text-gray-800 shadow-sm flex items-center gap-1.5 border border-white/40">
+                          {getCategoryConfig(article.category).icon}
+                          {article.category}
+                        </span>
                       </div>
                     </div>
-                    <span className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--primary-color)] group-hover:text-white transition-all duration-300">
-                      <ChevronRight size={16} />
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+
+                    {/* Content Area */}
+                    <div className="p-6 flex flex-col flex-grow relative">
+                      {/* Decorative Line */}
+                      <div className="absolute top-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-gray-100 to-transparent"></div>
+
+                      <div className="flex items-center gap-3 text-[11px] text-gray-400 mb-3 font-semibold uppercase tracking-wider">
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} className="text-[var(--primary-color)]" /> {article.readTime}
+                        </span>
+                        <span className="text-gray-300">•</span>
+                        <span>{article.date}</span>
+                      </div>
+
+                      <h3 className="text-xl font-bold text-gray-800 mb-3 line-clamp-2 leading-snug group-hover:text-[var(--primary-color)] transition-colors">
+                        {article.title}
+                      </h3>
+
+                      <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 mb-6 flex-grow font-light">
+                        {article.excerpt}
+                      </p>
+
+                      <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 border border-gray-100 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
+                            <User size={14} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase">Penulis</span>
+                            <span className="text-xs font-bold text-gray-700 truncate max-w-[100px]">{article.author}</span>
+                          </div>
+                        </div>
+                        <span className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--primary-color)] group-hover:text-white transition-all duration-300">
+                          <ChevronRight size={16} />
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         ) : (
           /* --- EMPTY STATE --- */
-          <div className="flex flex-col items-center justify-center py-24 text-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center py-24 text-center"
+          >
             <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 animate-pulse">
               <Search size={40} className="text-gray-300" />
             </div>
@@ -240,7 +320,7 @@ export default function ArtikelPage() {
             >
               Reset Pencarian
             </button>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

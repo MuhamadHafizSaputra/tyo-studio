@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import ChildSelector from './ChildSelector';
 import { toast } from 'sonner';
 
-// Import logika perhitungan cerdas yang sudah diperbaiki
+// --- IMPORT BARU (LOGIKA CERDAS KATEGORI UMUR) ---
 import { assessNutritionalStatus } from '@/lib/calculator';
 
 const initialRecord = {
@@ -48,8 +48,6 @@ export default function StuntingForm({
     height: '',
   });
 
-  // PERBAIKAN: Menambahkan 'zScoreLabel' (opsional) ke definisi tipe state
-  // agar tidak muncul warning merah di editor.
   const [result, setResult] = useState<{
     zScore: number;
     status: string;
@@ -57,7 +55,6 @@ export default function StuntingForm({
     isStunting: boolean; // Flag untuk menentukan warna box (Merah/Hijau)
     bmi: number;
     bmiStatus: string;
-    zScoreLabel?: string; // <--- Properti tambahan untuk label dinamis
   } | null>(null);
 
   const [aiLoading, setAiLoading] = useState(false);
@@ -157,7 +154,7 @@ export default function StuntingForm({
 
 
   // ===============================================
-  // CORE CALCULATION LOGIC (MENGGUNAKAN LOGIKA BARU)
+  // CORE CALCULATION LOGIC (UPDATED)
   // ===============================================
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,21 +172,23 @@ export default function StuntingForm({
     const weight = parseFloat(formData.weight);
     const genderKey = (formData.gender === 'Laki-laki' || formData.gender === 'male') ? 'male' : 'female';
 
-    // B. Panggil Calculator Cerdas (Sesuai perbaikan sebelumnya)
+    // B. Panggil Calculator Cerdas (Otomatis deteksi Balita/Anak/Dewasa)
     const analysis = assessNutritionalStatus(age, weight, height, genderKey);
 
     // C. Mapping Hasil ke UI State
     // Menentukan apakah status "berbahaya" (Merah/Orange) atau "aman" (Hijau)
+    // Kita anggap aman jika warnanya hijau, selain itu warning.
     const isWarning = analysis.color !== 'text-green-600';
 
     setResult({
-      zScore: analysis.zScore || 0, 
+      zScore: analysis.zScore || 0, // Dewasa mungkin tidak ada Z-Score
       status: analysis.status,
+      // Gabungkan deskripsi dan saran medis agar tampil di kartu hasil
       description: `${analysis.description} ${analysis.recommendation}`,
       isStunting: isWarning,
       bmi: analysis.bmi,
-      bmiStatus: analysis.category === 'Dewasa' ? analysis.status : analysis.category,
-      zScoreLabel: analysis.zScoreLabel // Menyimpan label dinamis
+      // Jika kategori Balita, tampilkan kategori umurnya di label BMI
+      bmiStatus: analysis.category === 'Dewasa' ? analysis.status : analysis.category
     });
 
     // D. AI GENERATION (Secure Server Action)
@@ -221,7 +220,7 @@ export default function StuntingForm({
 
     setAiLoading(false);
 
-    // E. Save to Database
+    // E. Save to Database (Tetap jalan seperti semula)
     if (selectedChildId) {
       const supabase = createClient();
       console.log('Saving growth record...');
@@ -234,6 +233,7 @@ export default function StuntingForm({
           height: height,
           weight: weight,
           recorded_date: new Date().toISOString(),
+          // z_score: analysis.zScore (Bisa di-uncomment jika kolom DB sudah ada)
         }
       ]);
 
@@ -352,10 +352,10 @@ export default function StuntingForm({
         </form>
       </div>
 
-      {/* --- RIGHT COLUMN: RESULTS & RECOMMENDATIONS (TAMPILAN LAMA) --- */}
+      {/* --- RIGHT COLUMN: RESULTS & RECOMMENDATIONS --- */}
       <div className="w-full lg:w-2/3 space-y-6">
 
-        {/* 1. Result Card (Style Lama: Border Kiri Tebal) */}
+        {/* 1. Result Card */}
         {aiLoading ? (
           <Skeleton className="h-48 w-full rounded-2xl" />
         ) : result ? (
@@ -368,10 +368,7 @@ export default function StuntingForm({
             </p>
             <div className="mt-6 flex flex-wrap gap-4">
               <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
-                {/* Menampilkan label dinamis jika ada, default ke INDEX */}
-                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">
-                  Z-Score / {result.zScoreLabel || 'INDEX'}
-                </span>
+                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Z-Score / Index</span>
                 <p className="text-2xl font-black text-gray-800">{result.zScore}</p>
               </div>
               <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
@@ -393,7 +390,7 @@ export default function StuntingForm({
           />
         )}
 
-        {/* 2. Recommendations List (Tampilan Grid Lama) */}
+        {/* 2. Recommendations List */}
         {result && (
           <div>
             <h3 className="font-bold text-gray-800 text-xl mb-4 flex items-center gap-2">

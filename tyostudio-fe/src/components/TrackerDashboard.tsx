@@ -22,7 +22,7 @@ interface TrackerDashboardProps {
   userLocation?: string;
 }
 
-// --- DATA STANDARD WHO (Simplified for Demo) ---
+// --- DATA STANDARD WHO ---
 const standardData = [
   { month: 0, heightIdeal: 50, heightBorder: 46, weightIdeal: 3.3, weightBorder: 2.5 },
   { month: 6, heightIdeal: 68, heightBorder: 64, weightIdeal: 7.9, weightBorder: 6.4 },
@@ -100,19 +100,15 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
   // Handle Child Switch
   const handleChildSelect = (childId: string) => {
-    // Navigate to same page but with new childId query param
-    // This triggers SSR re-fetch in page.tsx
     router.push(`/track?childId=${childId}`);
   };
 
   const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
 
-  // Handle Delete Request
   const handleDeleteRequest = (recordId: string) => {
     setDeleteRecordId(recordId);
   };
 
-  // Confirm Delete
   const confirmDelete = async () => {
     if (!deleteRecordId) return;
 
@@ -131,18 +127,13 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     setDeleteRecordId(null);
   };
 
-  // Merge User Data with Standard Data (interpolated for smoothness)
   const chartData = useMemo(() => {
-    // 1. Get all unique months to plot (Standard points + User points)
-    // Actually, generating a continuous monthly series is better for the X-Axis scale
     const maxUserMonth = growthRecords.length > 0 ? Math.max(...growthRecords.map(r => r.age_in_months)) : 0;
-    const maxMonth = Math.max(36, maxUserMonth + 1); // At least up to 36 months
+    const maxMonth = Math.max(36, maxUserMonth + 1); 
 
     const data = [];
 
     for (let m = 0; m <= maxMonth; m++) {
-      // Linear Interpolation for Standard Data
-      // Find indices in standardData
       const lower = standardData.filter(d => d.month <= m).pop() || standardData[0];
       const upper = standardData.find(d => d.month >= m) || standardData[standardData.length - 1];
 
@@ -155,23 +146,20 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
       const stdPoint = {
         heightIdeal: parseFloat(lerp(lower.heightIdeal, upper.heightIdeal).toFixed(1)),
-        heightBorder: parseFloat(lerp(lower.heightBorder, upper.heightBorder).toFixed(1)), // Stunting border
+        heightBorder: parseFloat(lerp(lower.heightBorder, upper.heightBorder).toFixed(1)),
         weightIdeal: parseFloat(lerp(lower.weightIdeal, upper.weightIdeal).toFixed(1)),
-        weightBorder: parseFloat(lerp(lower.weightBorder, upper.weightBorder).toFixed(1)), // Underweight border
+        weightBorder: parseFloat(lerp(lower.weightBorder, upper.weightBorder).toFixed(1)),
       };
 
-      // Find exact user record for this month (if any)
-      // If multiple records in same month, take the last one (or average?) -> taking last seems reasonable
       const userRec = growthRecords.find(r => Math.round(r.age_in_months) === m);
 
       let zScore = null;
       if (userRec) {
-        // Rough Z-Score Check
         zScore = ((userRec.height - stdPoint.heightIdeal) / 3).toFixed(1);
       }
 
       data.push({
-        age: m, // numeric for XAxis type="number" if needed, or string "X Bln"
+        age: m, 
         label: `${m} Bln`,
         heightIdeal: stdPoint.heightIdeal,
         heightBorder: stdPoint.heightBorder,
@@ -186,28 +174,15 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     return data;
   }, [growthRecords]);
 
-  // Latest Record for Summary
-  const currentStatus = chartData.findLast(d => d.heightChild !== null) || chartData[0];
-
-  // History Logs (Reverse Chronological) - Get last 5
-  // growthRecords is ascending, so we simply reverse copy
-  const historyLogs = [...growthRecords].reverse().slice(0, 5);
-
   const fetchRecommendations = async () => {
     if (!child || growthRecords.length === 0 || fetchingRef.current || hasGenerated) return;
 
-    // Prevent double fetching in StrictMode
     fetchingRef.current = true;
     setLoadingRecs(true);
     setErrorRecs(null);
 
     try {
-      // Get latest record for stats
       const latest = growthRecords[growthRecords.length - 1];
-
-      // Calculate Z-Score (Rough Estimate) to determine status
-      // Ideally this should be calculated precisely
-      const heightZ = (latest.height - 85) / 4; // Dummy formula reference
       const weightZ = (latest.weight - 12) / 2;
 
       let status = "Gizi Baik";
@@ -247,12 +222,9 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
   };
 
   useEffect(() => {
-    // Only fetch if we have data and haven't generated yet (or if child changes, we reset hasGenerated?)
-    // Actually we should reset hasGenerated when child changes.
     fetchRecommendations();
-  }, [child?.id, growthRecords]); // Dependencies
+  }, [child?.id, growthRecords]);
 
-  // Reset state when child changes
   useEffect(() => {
     setRecommendations([]);
     setHasGenerated(false);
@@ -261,8 +233,8 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
   }, [child?.id]);
 
   const handleRetry = () => {
-    setHasGenerated(false); // Enable fetching again
-    fetchingRef.current = false; // Reset lock
+    setHasGenerated(false); 
+    fetchingRef.current = false;
     fetchRecommendations();
   };
 
@@ -287,10 +259,11 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         </div>
 
         {/* Child Selector & Add Button */}
-        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-end"> 
-          {/* Child Selector */}
+        {/* PERUBAHAN UTAMA DI SINI: items-end agar sejajar dengan input box, bukan label */}
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-end">
+          
           {allChildren && allChildren.length > 0 && (
-            <div className="w-full md:w-56">
+            <div className="w-full md:w-64">
               <ChildSelector
                 childrenData={allChildren}
                 selectedId={child?.id}
@@ -300,12 +273,13 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
           )}
 
           {/* Add Data Button */}
+          {/* PERUBAHAN: Tinggi (h-[42px]) disamakan dengan input standar */}
           {child && (
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="h-[50px] flex justify-center items-center gap-2 px-5 bg-[var(--primary-color)] text-white font-bold text-sm rounded-xl shadow-sm hover:bg-teal-700 hover:shadow-md transition-all mb-[1px] min-w-[140px]" 
+              className="h-[42px] flex justify-center items-center gap-2 px-4 bg-[var(--primary-color)] text-white font-bold text-sm rounded-lg shadow-sm hover:bg-teal-700 hover:shadow-md transition w-full md:w-auto mb-[1px]"
             >
-              <PlusCircle size={18} strokeWidth={2.5} />
+              <PlusCircle size={16} /> {/* Icon diperkecil sedikit */}
               <span>Catat Data</span>
             </button>
           )}
@@ -391,7 +365,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               </ResponsiveContainer>
             </div>
 
-            {/* Legend Manual yang Clean */}
+            {/* Legend Manual */}
             <div className="flex justify-center gap-6 mt-8">
               {activeTab !== 'zscore' ? (
                 <>
@@ -440,7 +414,6 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
             <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
 
-              {/* Empty State / Initial Loading if no records */}
               {!loadingRecs && !errorRecs && recommendations.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-center p-4 opacity-70">
                   <div className="text-3xl mb-2 grayscale">🥘</div>
@@ -452,7 +425,6 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                 </div>
               )}
 
-              {/* Error State */}
               {errorRecs && (
                 <div className="flex flex-col items-center justify-center h-full text-center p-4">
                   <div className="text-3xl mb-2">⚠️</div>
@@ -468,7 +440,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                 </div>
               )}
 
-              {(loadingRecs || (recommendations.length === 0 && !hasGenerated && !errorRecs && growthRecords.length > 0)) && ( /* Skeleton Loading */
+              {(loadingRecs || (recommendations.length === 0 && !hasGenerated && !errorRecs && growthRecords.length > 0)) && (
                 <div className="space-y-4 animate-pulse">
                   <div className="flex gap-2 items-center text-teal-600 text-xs font-bold mb-2">
                     <Sparkles size={14} className="animate-spin" />
@@ -546,7 +518,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       {deleteRecordId && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl transform transition-all scale-100">
