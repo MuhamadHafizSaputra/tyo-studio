@@ -19,15 +19,15 @@ function LandingPage() {
         <Hero />
 
         {/* Section 1: Fitur Utama */}
-        <Features />
+        {/* <Features /> */}
 
         {/* Section 2: Preview Output */}
-        <div className="bg-white">
+        {/* <div className="bg-white">
           <BiometricSection />
-        </div>
+        </div> */}
 
         {/* Section 3: Saran Nutrisi */}
-        <section className="container mx-auto px-5 py-20">
+        {/* <section className="container mx-auto px-5 py-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[var(--primary-color)] mb-4">
               Rekomendasi Menu Harian
@@ -46,13 +46,13 @@ function LandingPage() {
               />
             ))}
           </div>
-        </section>
+        </section> */}
 
         {/* Section 4: Cara Kerja */}
-        <HowItWorks />
+        {/* <HowItWorks /> */}
 
         {/* Section 5: CTA (Call to Action) */}
-        <section className="container mx-auto px-5 mb-20">
+        {/* <section className="container mx-auto px-5 mb-20">
           <div className="bg-[var(--primary-color)] text-white text-center py-16 px-6 rounded-3xl mx-auto max-w-5xl shadow-2xl shadow-teal-200">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">Siap Memantau Tumbuh Kembang Anak?</h2>
             <p className="text-lg opacity-90 mb-10 max-w-2xl mx-auto">
@@ -62,7 +62,7 @@ function LandingPage() {
               Mulai Gratis
             </button>
           </div>
-        </section>
+        </section> */}
       </main>
     </div>
   );
