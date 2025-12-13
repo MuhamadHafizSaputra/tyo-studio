@@ -95,57 +95,85 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     router.push(`/track?childId=${childId}`);
   };
 
-  // Handle Delete Record
-  const handleDeleteRecord = async (recordId: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data pengukuran ini?')) {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('growth_records')
-        .delete()
-        .eq('id', recordId);
+  const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
 
-      if (error) {
-        toast.error('Gagal menghapus data: ' + error.message);
-      } else {
-        toast.success('Data pengukuran berhasil dihapus');
-        router.refresh();
-      }
-    }
+  // Handle Delete Request
+  const handleDeleteRequest = (recordId: string) => {
+    setDeleteRecordId(recordId);
   };
 
-  // Merge Standard Data with User Data
+  // Confirm Delete
+  const confirmDelete = async () => {
+    if (!deleteRecordId) return;
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('growth_records')
+      .delete()
+      .eq('id', deleteRecordId);
+
+    if (error) {
+      toast.error('Gagal menghapus data: ' + error.message);
+    } else {
+      toast.success('Data pengukuran berhasil dihapus');
+      router.refresh();
+    }
+    setDeleteRecordId(null);
+  };
+
+  // Merge User Data with Standard Data (interpolated for smoothness)
   const chartData = useMemo(() => {
-    // Map records by month (buckets)
-    const recordsMap = new Map();
-    growthRecords.forEach(r => {
-      // Simple bucketing to nearest 6 months or exact match?
-      // Let's bucket by closest standard point for demo visualization
-      // Or better: Just use age_in_months
-      const bucket = standardData.reduce((prev, curr) =>
-        Math.abs(curr.month - r.age_in_months) < Math.abs(prev.month - r.age_in_months) ? curr : prev
-      ).month;
+    // 1. Get all unique months to plot (Standard points + User points)
+    // Actually, generating a continuous monthly series is better for the X-Axis scale
+    const maxUserMonth = growthRecords.length > 0 ? Math.max(...growthRecords.map(r => r.age_in_months)) : 0;
+    const maxMonth = Math.max(36, maxUserMonth + 1); // At least up to 36 months
 
-      // If exact match or close enough, user data overrides
-      recordsMap.set(bucket, r);
-    });
+    const data = [];
 
-    return standardData.map(std => {
-      const rec = recordsMap.get(std.month);
-      // Calculate naive Z-Score if record exists
-      let zScore = null;
-      if (rec) {
-        // Very rough approx
-        zScore = ((rec.height - std.heightIdeal) / 3).toFixed(1);
+    for (let m = 0; m <= maxMonth; m++) {
+      // Linear Interpolation for Standard Data
+      // Find indices in standardData
+      const lower = standardData.filter(d => d.month <= m).pop() || standardData[0];
+      const upper = standardData.find(d => d.month >= m) || standardData[standardData.length - 1];
+
+      let fraction = 0;
+      if (upper.month !== lower.month) {
+        fraction = (m - lower.month) / (upper.month - lower.month);
       }
 
-      return {
-        age: `${std.month} Bln`,
-        heightChild: rec ? rec.height : null,
-        weightChild: rec ? rec.weight : null,
-        zScore: zScore ? parseFloat(zScore) : null,
-        ...std
+      const lerp = (start: number, end: number) => start + (end - start) * fraction;
+
+      const stdPoint = {
+        heightIdeal: parseFloat(lerp(lower.heightIdeal, upper.heightIdeal).toFixed(1)),
+        heightBorder: parseFloat(lerp(lower.heightBorder, upper.heightBorder).toFixed(1)), // Stunting border
+        weightIdeal: parseFloat(lerp(lower.weightIdeal, upper.weightIdeal).toFixed(1)),
+        weightBorder: parseFloat(lerp(lower.weightBorder, upper.weightBorder).toFixed(1)), // Underweight border
       };
-    });
+
+      // Find exact user record for this month (if any)
+      // If multiple records in same month, take the last one (or average?) -> taking last seems reasonable
+      const userRec = growthRecords.find(r => Math.round(r.age_in_months) === m);
+
+      let zScore = null;
+      if (userRec) {
+        // Rough Z-Score Check
+        zScore = ((userRec.height - stdPoint.heightIdeal) / 3).toFixed(1);
+      }
+
+      data.push({
+        age: m, // numeric for XAxis type="number" if needed, or string "X Bln"
+        label: `${m} Bln`,
+        heightIdeal: stdPoint.heightIdeal,
+        heightBorder: stdPoint.heightBorder,
+        weightIdeal: stdPoint.weightIdeal,
+        weightBorder: stdPoint.weightBorder,
+        heightChild: userRec ? userRec.height : null,
+        weightChild: userRec ? userRec.weight : null,
+        zScore: zScore ? parseFloat(zScore) : null,
+      });
+    }
+
+    return data;
   }, [growthRecords]);
 
   // Latest Record for Summary
@@ -234,7 +262,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="age" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} interval="preserveStartEnd" minTickGap={30} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dx={-10} />
                   <Tooltip content={<CustomTooltip mode={activeTab} />} cursor={{ stroke: '#E5E7EB', strokeWidth: 2 }} />
 
@@ -399,7 +427,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                     <td className="px-4 py-3 text-orange-400 font-bold">{record.weight}</td>
                     <td className="px-4 py-3 text-center">
                       <button
-                        onClick={() => handleDeleteRecord(record.id)}
+                        onClick={() => handleDeleteRequest(record.id)}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
                         title="Hapus Data"
                       >
@@ -410,6 +438,44 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteRecordId && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl transform transition-all scale-100">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Hapus Data?</h3>
+              <button
+                onClick={() => setDeleteRecordId(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 18 18" /></svg>
+              </button>
+            </div>
+
+            <p className="text-gray-600 mb-6 text-sm leading-relaxed">
+              Apakah Bunda yakin ingin menghapus data pengukuran ini?
+              <br /><br />
+              <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded">⚠️ Data yang dihapus tidak dapat dikembalikan.</span>
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteRecordId(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition text-sm"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition shadow-md text-sm"
+              >
+                Ya, Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}
