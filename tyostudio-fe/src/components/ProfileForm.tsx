@@ -42,6 +42,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
 
   const [childForm, setChildForm] = useState(emptyChildForm);
   const [childLoading, setChildLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
 
   // --- Handlers: Parent ---
   const handleSaveParent = async (e: React.FormEvent) => {
@@ -53,8 +54,22 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
       .update({ full_name: parentName, location: location })
       .eq('id', user.id);
 
-    if (error) toast.error('Gagal update profil bunda: ' + error.message);
-    else toast.success('Profil Bunda berhasil disimpan!');
+    if (error) {
+      toast.error('Gagal update profil bunda: ' + error.message);
+    } else {
+      // Also update Supabase Auth Metadata so the Navbar updates immediately
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { full_name: parentName }
+      });
+
+      if (authError) {
+        console.error('Error updating auth metadata:', authError);
+      } else {
+        router.refresh(); // Refresh server components to reflect changes in Navbar
+      }
+
+      toast.success('Profil Bunda berhasil disimpan!');
+    }
 
     setParentLoading(false);
   };
@@ -62,6 +77,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
   // --- Handlers: Children Selection ---
   const handleSelectChild = (id: string | 'new') => {
     setSelectedChildId(id);
+    setIsEditing(id === 'new');
     if (id === 'new') {
       setChildForm(emptyChildForm);
     } else {
@@ -105,6 +121,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
       if (data) {
         setChildrenList([...childrenList, data[0]]);
         setSelectedChildId(data[0].id); // Switch to editing the new child
+        setIsEditing(false); // Switch to view mode
         toast.success('Data anak berhasil ditambahkan!');
       }
     } else {
@@ -113,6 +130,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
       error = err;
       if (!error) {
         setChildrenList(childrenList.map(c => c.id === selectedChildId ? { ...c, ...payload, id: selectedChildId } : c));
+        setIsEditing(false); // Switch to view mode
         toast.success('Data anak berhasil diperbarui!');
       }
     }
@@ -149,8 +167,12 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
     setChildToDelete(null);
   };
 
-
-
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.refresh(); // Or redirect to login
+    router.push('/login');
+  };
 
 
   return (
@@ -247,6 +269,15 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
             )}
           </div>
         </div>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="w-full py-3 bg-red-50 text-red-500 font-bold rounded-2xl border border-red-100 hover:bg-red-100 hover:border-red-200 transition flex items-center justify-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          Keluar Aplikasi
+        </button>
       </div>
 
       {/* RIGHT COL: Child Form */}
@@ -266,9 +297,10 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
               name="name"
               value={childForm.name}
               onChange={handleChildChange}
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none disabled:bg-gray-50 disabled:text-gray-500"
               placeholder="Nama Lengkap Anak"
               required
+              disabled={!isEditing}
             />
           </div>
 
@@ -280,19 +312,20 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
                 name="date_of_birth"
                 value={childForm.date_of_birth}
                 onChange={handleChildChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none disabled:bg-gray-50 disabled:text-gray-500"
                 required
+                disabled={!isEditing}
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-600 mb-2">Jenis Kelamin</label>
               <div className="flex gap-3">
-                <label className={`flex-1 p-3 rounded-lg border cursor-pointer text-center text-sm font-medium transition ${childForm.gender === 'male' ? 'border-[var(--primary-color)] bg-teal-50 text-[var(--primary-color)]' : 'border-gray-200 text-gray-500'}`}>
-                  <input type="radio" name="gender" value="male" className="hidden" onClick={() => setChildForm({ ...childForm, gender: 'male' })} />
+                <label className={`flex-1 p-3 rounded-lg border cursor-pointer text-center text-sm font-medium transition ${childForm.gender === 'male' ? 'border-[var(--primary-color)] bg-teal-50 text-[var(--primary-color)]' : 'border-gray-200 text-gray-500'} ${!isEditing ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                  <input type="radio" name="gender" value="male" className="hidden" onClick={() => isEditing && setChildForm({ ...childForm, gender: 'male' })} disabled={!isEditing} />
                   👦 Laki-laki
                 </label>
-                <label className={`flex-1 p-3 rounded-lg border cursor-pointer text-center text-sm font-medium transition ${childForm.gender === 'female' ? 'border-pink-400 bg-pink-50 text-pink-500' : 'border-gray-200 text-gray-500'}`}>
-                  <input type="radio" name="gender" value="female" className="hidden" onClick={() => setChildForm({ ...childForm, gender: 'female' })} />
+                <label className={`flex-1 p-3 rounded-lg border cursor-pointer text-center text-sm font-medium transition ${childForm.gender === 'female' ? 'border-pink-400 bg-pink-50 text-pink-500' : 'border-gray-200 text-gray-500'} ${!isEditing ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                  <input type="radio" name="gender" value="female" className="hidden" onClick={() => isEditing && setChildForm({ ...childForm, gender: 'female' })} disabled={!isEditing} />
                   👧 Perempuan
                 </label>
               </div>
@@ -308,8 +341,9 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
                 step="0.1"
                 value={childForm.birth_weight}
                 onChange={handleChildChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none disabled:bg-gray-50 disabled:text-gray-500"
                 placeholder="3.0"
+                disabled={!isEditing}
               />
             </div>
             <div>
@@ -320,29 +354,48 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
                 step="0.1"
                 value={childForm.birth_height}
                 onChange={handleChildChange}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none disabled:bg-gray-50 disabled:text-gray-500"
                 placeholder="50"
+                disabled={!isEditing}
               />
             </div>
           </div>
 
           <div className="pt-4 flex justify-end gap-3">
-            {selectedChildId !== 'new' && (
+            {!isEditing ? (
               <button
                 type="button"
-                onClick={() => handleSelectChild('new')}
-                className="px-6 py-3 rounded-lg text-gray-500 hover:bg-gray-100 transition font-bold"
+                onClick={() => setIsEditing(true)}
+                className="px-8 py-3 rounded-lg bg-yellow-500 text-white font-bold hover:bg-yellow-600 transition shadow-md"
               >
-                Batal
+                ✏️ Edit Data
               </button>
+            ) : (
+              <>
+                {selectedChildId !== 'new' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      handleSelectChild(selectedChildId); // Reset form
+                    }}
+                    className="px-6 py-3 rounded-lg text-gray-500 hover:bg-gray-100 transition font-bold"
+                  >
+                    Batal
+                  </button>
+                )}
+                {/* For New Child, Cancel switches back to 'new' (handled by handleSelectChild logic maybe? actually handleSelectChild('new') resets form) */}
+                {/* Reset Button Removed */}
+
+                <button
+                  type="submit"
+                  disabled={childLoading}
+                  className="px-8 py-3 rounded-lg bg-[var(--primary-color)] text-white font-bold hover:bg-teal-600 transition shadow-md disabled:opacity-50"
+                >
+                  {childLoading ? 'Menyimpan...' : (selectedChildId === 'new' ? 'Tambah Data Anak' : 'Simpan Perubahan')}
+                </button>
+              </>
             )}
-            <button
-              type="submit"
-              disabled={childLoading}
-              className="px-8 py-3 rounded-lg bg-[var(--primary-color)] text-white font-bold hover:bg-teal-600 transition shadow-md disabled:opacity-50"
-            >
-              {childLoading ? 'Menyimpan...' : (selectedChildId === 'new' ? 'Tambah Data Anak' : 'Simpan Perubahan')}
-            </button>
           </div>
         </form>
       </div>
