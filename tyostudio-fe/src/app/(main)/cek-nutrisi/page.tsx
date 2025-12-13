@@ -3,15 +3,18 @@
 import React, { useState } from 'react';
 
 import { createClient } from '@/utils/supabase/client';
+import ChildSelector from '@/components/ChildSelector';
+import { differenceInYears } from 'date-fns';
 
-// Default AKG Values
-const AKG_STANDARDS = {
+// Default AKG Values (Fallback)
+const AKG_FALLBACK = {
     cal: 2150, // kcal
     prot: 60,  // gram
     carb: 300, // gram
     fat: 70    // gram
 };
 
+// ... existing interfaces ...
 interface FoodItem {
     name: string;
     cal: number;
@@ -29,30 +32,162 @@ export default function CekNutrisiPage() {
     const [results, setResults] = useState<FoodItem[] | null>(null);
     const [showAnalysis, setShowAnalysis] = useState(false);
 
+    // Personalized Nutrition State
+    const [children, setChildren] = useState<any[]>([]);
+    const [selectedChildId, setSelectedChildId] = useState<string>('');
+    const [childStats, setChildStats] = useState<{ weight: number; height: number; age: number; gender: string } | null>(null);
+    const [activityLevel, setActivityLevel] = useState<number>(1.375); // Default Lightly Active
+
+    // Calculated Needs
+    const [dailyNeeds, setDailyNeeds] = useState(AKG_FALLBACK);
+
     // Remote Data State
     const [dbData, setDbData] = useState<Record<string, { cal: number; prot: number; carb: number; fat: number }>>({});
+
+    const [user, setUser] = useState<any>(null);
+
+    // === FETCH CHILDREN ON MOUNT ===
+    React.useEffect(() => {
+        const fetchChildren = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+            if (user) {
+                const { data } = await supabase
+                    .from('children')
+                    .select('*')
+                    .eq('user_id', user.id);
+                if (data) setChildren(data);
+            }
+        };
+        fetchChildren();
+    }, []);
+
+    // === FETCH CHILD STATS ON SELECT ===
+    React.useEffect(() => {
+        const fetchChildStats = async () => {
+            if (!selectedChildId) {
+                setChildStats(null);
+                setDailyNeeds(AKG_FALLBACK);
+                return;
+            }
+
+            const child = children.find(c => c.id === selectedChildId);
+            if (!child) return;
+
+            // Get latest growth record
+            const { data: records } = await supabase
+                .from('growth_records')
+                .select('*')
+                .eq('child_id', selectedChildId)
+                .order('recorded_date', { ascending: false })
+                .limit(1);
+
+            let weight = child.birth_weight || 0;
+            let height = child.birth_height || 0;
+
+            // Use latest record if available, otherwise birth data (fallback)
+            if (records && records.length > 0) {
+                weight = Number(records[0].weight);
+                height = Number(records[0].height);
+            }
+
+            const age = differenceInYears(new Date(), new Date(child.date_of_birth));
+
+            setChildStats({
+                weight,
+                height,
+                age,
+                gender: child.gender
+            });
+        };
+        fetchChildStats();
+    }, [selectedChildId, children]);
+
+    // === RECALCULATE NEEDS WHEN STATS/ACTIVITY CHANGE ===
+    React.useEffect(() => {
+        if (childStats && childStats.weight > 0 && childStats.height > 0) {
+            // Mifflin-St Jeor Formula
+            // Men: 10W + 6.25H - 5A + 5
+            // Women: 10W + 6.25H - 5A - 161
+
+            const isMale = childStats.gender === 'male' || childStats.gender === 'Laki-laki';
+            let bmr = (10 * childStats.weight) + (6.25 * childStats.height) - (5 * childStats.age);
+            bmr += isMale ? 5 : -161;
+
+            // Hospital Shortcut Check (if height < 150/160 depending on gender... simplified logic as requested)
+            // But let's stick to Mifflin as primary requested by user detailed explanation.
+
+            const tee = Math.round(bmr * activityLevel);
+
+            // Macros (Indonesian Ministry of Health Recommendation)
+            // Carb 50-65% (avg 60%), Prot 10-20% (avg 15%), Fat 20-30% (avg 25%)
+            const carb = Math.round((tee * 0.60) / 4);
+            const prot = Math.round((tee * 0.15) / 4);
+            const fat = Math.round((tee * 0.25) / 9);
+
+            setDailyNeeds({
+                cal: tee,
+                prot: prot,
+                carb: carb,
+                fat: fat
+            });
+        }
+    }, [childStats, activityLevel]);
 
     // === FETCH DATA ON MOUNT ===
     React.useEffect(() => {
         const fetchFoodData = async () => {
-            const { data, error } = await supabase
-                .from('makanan_pokok')
-                .select('*');
+            console.log("Fetching food data...");
+            const results = await Promise.all([
+                supabase.from('makanan').select('*'), // User requested 'makanan' table
+                supabase.from('recommended_menus').select('*')
+            ]);
 
-            if (data) {
-                const mapped: Record<string, { cal: number; prot: number; carb: number; fat: number }> = {};
-                data.forEach((item: any) => {
-                    // Normalize Name
-                    const key = item.nama_makanan.toLowerCase();
-                    mapped[key] = {
-                        cal: Number(item['kalori(kkal)']) || 0,
-                        prot: Number(item['protein(g)']) || 0,
-                        carb: Number(item['karbonhidrat(g)']) || 0,
-                        fat: Number(item['lemak(g)']) || 0
-                    };
+            const [pokok, recommended] = results;
+            const mapped: Record<string, { cal: number; prot: number; carb: number; fat: number }> = {};
+
+            // Helper to extract values regardless of column naming conventions
+            const extractNutrients = (item: any) => ({
+                cal: Number(item['Kalori(Kkal)'] || item.kalori || item['kalori(kkal)'] || item.calories || 0),
+                prot: Number(item['Protein(g)'] || item.protein || item['protein(g)'] || 0),
+                carb: Number(item['Karbo(g)'] || item.karbo || item.karbohidrat || item['karbonhidrat(g)'] || item.carbs || 0),
+                fat: Number(item['Lemak(g)'] || item.lemak || item['lemak(g)'] || item.fats || 0)
+            });
+
+            // Process Makanan (Main Table)
+            if (pokok.data && pokok.data.length > 0) {
+                // console.log("Raw 'makanan' data sample:", JSON.stringify(pokok.data[0])); // DEBUG
+                // console.log("Makanan Table Columns:", Object.keys(pokok.data[0]));       // DEBUG: View keys
+
+                pokok.data.forEach((item: any) => {
+                    // Try multiple name fields including the one found in logs: Menu_Makanan
+                    const rawName = item.Menu_Makanan || item.nama || item.nama_makanan || item.name || '';
+                    const key = rawName.trim().toLowerCase(); // Normalize DB side too
+
+                    if (key) {
+                        mapped[key] = extractNutrients(item);
+                    }
                 });
-                setDbData(mapped);
+            } else if (pokok.error) {
+                console.error("Error fetching 'makanan':", pokok.error);
             }
+
+            // Process Recommended Menus (Merge)
+            if (recommended.data) {
+                recommended.data.forEach((item: any) => {
+                    const key = (item.makanan || item.name || '').toLowerCase();
+                    if (key && !mapped[key]) {
+                        mapped[key] = {
+                            cal: Number(item.kalori_kkal || item.kalori) || 0,
+                            prot: Number(item.protein_g || item.protein) || 0,
+                            carb: Number(item.karbonhidrat_g || item.karbonhidrat) || 0,
+                            fat: Number(item.lemak_g || item.lemak) || 0
+                        };
+                    }
+                });
+            }
+
+            setDbData(mapped);
         };
         fetchFoodData();
     }, []);
@@ -79,7 +214,7 @@ export default function CekNutrisiPage() {
         const aggregated: Record<string, FoodItem> = {};
 
         inputs.forEach(input => {
-            const cleanName = input.value.trim().toLowerCase();
+            const cleanName = input.value.trim().toLowerCase().replace(/\s+/g, ' '); // Normalize spaces
             if (!cleanName) return;
 
             // Simple match logic (exact match first, then partial)
@@ -146,13 +281,33 @@ export default function CekNutrisiPage() {
             <main className="flex-grow container mx-auto px-5 py-12">
                 <div className="max-w-4xl mx-auto">
 
-                    {/* Header */}
-                    <div className="text-center mb-10">
-                        <h1 className="text-3xl md:text-4xl font-bold text-[var(--primary-color)] mb-3">Cek Nutrisi Harian</h1>
-                        <p className="text-gray-600">
-                            Masukkan menu makanan Anda hari ini untuk mengetahui total asupan gizi dan analisis kesehatannya.
-                        </p>
+                    {/* Header with Personalization */}
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
+                        <div className="flex-1">
+                            <h1 className="text-3xl md:text-4xl font-bold text-[var(--primary-color)] mb-3">Cek Nutrisi Harian</h1>
+                            <p className="text-gray-600">
+                                Hitung asupan gizi harian berdasarkan kebutuhan unik Si Kecil.
+                            </p>
+                        </div>
+
+                        {/* Personalization Controls - Only for Logged In Users */}
+                        {user && (
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-orange-100 w-full lg:w-auto flex flex-col sm:flex-row gap-4">
+                                <div className="min-w-[200px]">
+                                    <ChildSelector
+                                        childrenData={children}
+                                        selectedId={selectedChildId}
+                                        onSelect={setSelectedChildId}
+                                        label="👤 Pilih Si Kecil"
+                                    />
+                                </div>
+
+                                {/* Activity Dropdown Removed */}
+                            </div>
+                        )}
                     </div>
+
+                    {/* Active Profile Summary Removed */}
 
                     {/* Input Section */}
                     <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-10">
@@ -191,7 +346,7 @@ export default function CekNutrisiPage() {
                                 onClick={addInput}
                                 className="flex-1 py-3 px-6 border-2 border-dashed border-gray-300 text-gray-500 font-semibold rounded-xl hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] hover:bg-teal-50 transition-all flex items-center justify-center gap-2"
                             >
-                                + Tambah Baris
+                                + Tambah Makanan
                             </button>
                             <button
                                 onClick={calculateNutrition}
@@ -246,11 +401,11 @@ export default function CekNutrisiPage() {
                                             </tr>
                                             {/* AKG % Row */}
                                             <tr className="bg-teal-50/30 text-xs text-gray-500">
-                                                <td className="p-4 italic">% AKG (Harian)</td>
-                                                <td className="p-4 text-center">{Math.round((total.cal / AKG_STANDARDS.cal) * 100)}%</td>
-                                                <td className="p-4 text-center">{Math.round((total.prot / AKG_STANDARDS.prot) * 100)}%</td>
-                                                <td className="p-4 text-center">{Math.round((total.carb / AKG_STANDARDS.carb) * 100)}%</td>
-                                                <td className="p-4 text-center">{Math.round((total.fat / AKG_STANDARDS.fat) * 100)}%</td>
+                                                <td className="p-4 italic">% Kebutuhan Harian</td>
+                                                <td className="p-4 text-center">{Math.round((total.cal / dailyNeeds.cal) * 100)}%</td>
+                                                <td className="p-4 text-center">{Math.round((total.prot / dailyNeeds.prot) * 100)}%</td>
+                                                <td className="p-4 text-center">{Math.round((total.carb / dailyNeeds.carb) * 100)}%</td>
+                                                <td className="p-4 text-center">{Math.round((total.fat / dailyNeeds.fat) * 100)}%</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -268,25 +423,25 @@ export default function CekNutrisiPage() {
                                     <ul className="space-y-3">
                                         {/* Calorie Check */}
                                         <li className="flex gap-3 text-sm items-start">
-                                            <span className="text-xl mt-0.5">{total.cal > AKG_STANDARDS.cal ? '⚠️' : '✅'}</span>
+                                            <span className="text-xl mt-0.5">{total.cal > dailyNeeds.cal ? '⚠️' : '✅'}</span>
                                             <div>
-                                                <span className="font-semibold block">Kalori: {Math.round((total.cal / AKG_STANDARDS.cal) * 100)}% dari kebutuhan</span>
+                                                <span className="font-semibold block">Kalori: {Math.round((total.cal / dailyNeeds.cal) * 100)}% dari kebutuhan ({dailyNeeds.cal} kcal)</span>
                                                 <span className="text-gray-500">
-                                                    {total.cal > AKG_STANDARDS.cal
-                                                        ? "Asupan kalori berlebih. Pertimbangkan olahraga ringan untuk membakar ekstra kalori."
-                                                        : "Asupan kalori dalam batas wajar atau kurang (jika ini total seharian)."}
+                                                    {total.cal > dailyNeeds.cal
+                                                        ? "Asupan kalori berlebih hari ini."
+                                                        : "Asupan kalori aman."}
                                                 </span>
                                             </div>
                                         </li>
                                         {/* Protein Check */}
                                         <li className="flex gap-3 text-sm items-start">
-                                            <span className="text-xl mt-0.5">{total.prot < AKG_STANDARDS.prot * 0.8 ? '🥩' : '💪'}</span>
+                                            <span className="text-xl mt-0.5">{total.prot < dailyNeeds.prot * 0.8 ? '🥩' : '💪'}</span>
                                             <div>
-                                                <span className="font-semibold block">Protein: {Math.round((total.prot / AKG_STANDARDS.prot) * 100)}% terpenuhi</span>
+                                                <span className="font-semibold block">Protein: {Math.round((total.prot / dailyNeeds.prot) * 100)}% terpenuhi ({dailyNeeds.prot}g)</span>
                                                 <span className="text-gray-500">
-                                                    {total.prot < AKG_STANDARDS.prot * 0.8
-                                                        ? "Protein masih kurang. Bagus untuk pertumbuhan dan perbaikan otot."
-                                                        : "Asupan protein sudah cukup baik."}
+                                                    {total.prot < dailyNeeds.prot * 0.8
+                                                        ? "Protein masih kurang for pertumbuhan."
+                                                        : "Asupan protein cukup."}
                                                 </span>
                                             </div>
                                         </li>
@@ -299,18 +454,18 @@ export default function CekNutrisiPage() {
                                         💡 Rekomendasi
                                     </h4>
                                     <div className="text-gray-700 text-sm space-y-3">
-                                        {total.cal > AKG_STANDARDS.cal && (
-                                            <p>• <strong>Kurangi Porsi:</strong> Terdeteksi kelebihan kalori. Coba kurangi porsi karbohidrat (nasi/mie) di makan malam.</p>
+                                        {total.cal > dailyNeeds.cal && (
+                                            <p>• <strong>Kurangi Porsi:</strong> Terdeteksi kelebihan kalori.</p>
                                         )}
-                                        {total.fat > AKG_STANDARDS.fat && (
-                                            <p>• <strong>Lemak Tinggi:</strong> Kurangi makanan yang digoreng (deep fried). Ganti dengan metode rebus atau panggang.</p>
+                                        {total.fat > dailyNeeds.fat && (
+                                            <p>• <strong>Lemak Tinggi:</strong> Kurangi makanan yang digoreng.</p>
                                         )}
-                                        {total.prot < AKG_STANDARDS.prot / 2 && (
-                                            <p>• <strong>Tambah Lauk Pauk:</strong> Tambahkan telur, tempe, atau ikan untuk mengejar target protein harian.</p>
+                                        {total.prot < dailyNeeds.prot / 2 && (
+                                            <p>• <strong>Tambah Lauk Pauk:</strong> Tambahkan telur, tempe, atau ikan.</p>
                                         )}
-                                        {(total.cal <= AKG_STANDARDS.cal && total.fat <= AKG_STANDARDS.fat && total.prot >= AKG_STANDARDS.prot)
-                                            ? <p className="text-green-700 font-medium">✨ Pola makan Anda sudah cukup seimbang hari ini! Pertahankan variasi menu makanan.</p>
-                                            : <p>• Perbanyak sayuran serat tinggi untuk membantu pencernaan dan memberikan rasa kenyang lebih lama.</p>
+                                        {(total.cal <= dailyNeeds.cal && total.fat <= dailyNeeds.fat && total.prot >= dailyNeeds.prot)
+                                            ? <p className="text-green-700 font-medium">✨ Pola makan seimbang!</p>
+                                            : <p>• Perbanyak sayuran serat tinggi.</p>
                                         }
                                     </div>
                                 </div>

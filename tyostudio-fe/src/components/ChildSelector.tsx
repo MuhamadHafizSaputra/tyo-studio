@@ -20,9 +20,9 @@ const ChildSelector: React.FC<ChildSelectorProps> = ({
     onSelect,
     label = "Pilih Anak"
 }) => {
-    if (!childrenData || childrenData.length === 0) {
-        return null;
-    }
+    // if (!childrenData || childrenData.length === 0) {
+    //     return null;
+    // }
 
     return (
         <div className="w-full">
@@ -34,11 +34,15 @@ const ChildSelector: React.FC<ChildSelectorProps> = ({
                     className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
                 >
                     <option value="" disabled>-- Pilih Data Anak --</option>
-                    {childrenData.map((child) => (
-                        <option key={child.id} value={child.id}>
-                            {child.name}
-                        </option>
-                    ))}
+                    {(!childrenData || childrenData.length === 0) ? (
+                        <option value="" disabled>Belum ada data anak</option>
+                    ) : (
+                        childrenData.map((child) => (
+                            <option key={child.id} value={child.id}>
+                                {child.name}
+                            </option>
+                        ))
+                    )}
                 </select>
                 <div className="absolute right-3 top-3.5 pointer-events-none text-gray-500">
                     ▼
