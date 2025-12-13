@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '../../../utils/supabase/client';
+import { createClient } from '../../../utils/supabase/client'; //
 import { toast } from 'sonner';
 
 export default function LoginPage() {
@@ -11,6 +11,24 @@ export default function LoginPage() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+
+  // --- Tambahkan Fungsi ini ---
+  const handleGoogleLogin = async () => {
+    const supabase = createClient();
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // Arahkan ke route yang baru saja kita buat di langkah 1
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      toast.error(error.message);
+    }
+  };
+  // ---------------------------
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +89,29 @@ export default function LoginPage() {
           >
             {loading ? 'Memuat...' : 'Masuk'}
           </button>
+          
+          {/* --- Tambahkan Tombol Google di Sini --- */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-gray-300"></div>
+            <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">ATAU</span>
+            <div className="flex-grow border-t border-gray-300"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.16-7.27 1.94 0 3.73.74 5.02 1.85l2.16-2.16C17.6 2.96 15.4 2 12.16 2 6.65 2 2 6.65 2 12s4.65 10 10.16 10c7.1 0 10.56-6.19 8.96-10.9z"
+              />
+            </svg>
+            Masuk dengan Google
+          </button>
+           {/* --------------------------------------- */}
+
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-600">
