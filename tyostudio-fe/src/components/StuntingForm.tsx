@@ -2,16 +2,49 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-// Import Server Action
-import { generateFoodRecommendations } from '@/app/actions/gemini'; 
-
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { differenceInMonths } from "date-fns";
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Activity, AlertCircle } from 'lucide-react'; // Tambah AlertCircle
+import { Activity, Info, ChevronRight, Calculator } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import ChildSelector from './ChildSelector';
 import { toast } from 'sonner';
 import { assessNutritionalStatus } from '@/lib/calculator';
+
+// --- KOMPONEN VISUAL: METERAN Z-SCORE ---
+const ZScoreMeter = ({ score, label }: { score: number, label: string }) => {
+  // Clamp score antara -4 dan +4 untuk visualisasi agar tidak keluar chart
+  const clampedScore = Math.max(-4, Math.min(4, score));
+  // Konversi score (-4 s/d 4) ke persentase (0% s/d 100%)
+  // -4 = 0%, 0 = 50%, +4 = 100%
+  const percentage = ((clampedScore + 4) / 8) * 100;
+
+  return (
+    <div className="mt-6 mb-2">
+      <div className="flex justify-between text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wider">
+        <span>Bahaya (-3)</span>
+        <span>Normal (0)</span>
+        <span>Bahaya (+3)</span>
+      </div>
+      <div className="relative h-4 w-full rounded-full bg-gradient-to-r from-red-400 via-green-400 to-red-400 shadow-inner">
+        {/* Garis Batas Normal (-2 SD & +2 SD) */}
+        <div className="absolute top-0 bottom-0 left-[25%] w-[1px] bg-white/50"></div> {/* -2 */}
+        <div className="absolute top-0 bottom-0 left-[75%] w-[1px] bg-white/50"></div> {/* +2 */}
+        
+        {/* Penanda Posisi Anak */}
+        <div 
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-gray-700 rounded-full shadow-md transition-all duration-1000 ease-out flex items-center justify-center z-10"
+          style={{ left: `calc(${percentage}% - 8px)` }}
+        >
+          <div className="w-1 h-1 bg-gray-700 rounded-full"></div>
+        </div>
+      </div>
+      <p className="text-center text-xs text-gray-500 mt-2 font-medium">
+        Posisi {label}: <span className="font-bold text-gray-800">{score > 0 ? `+${score}` : score} SD</span>
+      </p>
+    </div>
+  );
+};
 
 const initialRecord = {
   child_id: '',
@@ -37,7 +70,6 @@ export default function StuntingForm({
   // --- STATE ---
   const [selectedChildId, setSelectedChildId] = useState<string>('');
   const [currentGrowthRecord, setCurrentGrowthRecord] = useState<any>(latestGrowthRecord || initialRecord);
-
   const selectedChild = childrenData?.find(c => c.id === selectedChildId);
 
   const [formData, setFormData] = useState({
@@ -60,7 +92,6 @@ export default function StuntingForm({
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
-  const [aiError, setAiError] = useState(false); // STATE ERROR AI
 
   // Static Fallback Recommendations
   const staticRecommendations = [
@@ -90,14 +121,14 @@ export default function StuntingForm({
     }
   ];
 
-  // 1. Auto-select first child if available
+  // 1. Auto-select first child
   useEffect(() => {
     if (childrenData && childrenData.length > 0 && !selectedChildId) {
       setSelectedChildId(childrenData[0].id);
     }
   }, [childrenData]);
 
-  // 2. Fetch latest growth record & Prefill Form
+  // 2. Fetch latest record & Prefill
   useEffect(() => {
     if (selectedChildId) {
       const fetchLastRecord = async () => {
@@ -113,16 +144,14 @@ export default function StuntingForm({
         if (data) setCurrentGrowthRecord(data);
         else setCurrentGrowthRecord(initialRecord);
       };
-
       fetchLastRecord();
     }
   }, [selectedChildId]);
 
-  // Sync Form with Selected Child
+  // Sync Form
   useEffect(() => {
     if (selectedChild) {
       const dobString = selectedChild.date_of_birth ? new Date(selectedChild.date_of_birth).toISOString().split('T')[0] : '';
-
       setFormData(prev => ({
         ...prev,
         dob: dobString,
@@ -135,7 +164,7 @@ export default function StuntingForm({
     }
   }, [selectedChild, currentGrowthRecord]);
 
-  // 3. Calculate Age Display
+  // Calculate Age Display
   useEffect(() => {
     if (formData.dob) {
       const birthDate = new Date(formData.dob);
@@ -143,7 +172,6 @@ export default function StuntingForm({
       const months = differenceInMonths(today, birthDate);
       const years = Math.floor(months / 12);
       const remainingMonths = months % 12;
-
       let display = `${months} Bulan`;
       if (years > 0) {
         display = `${years} Tahun ${remainingMonths > 0 ? `${remainingMonths} Bulan` : ''}`;
@@ -154,112 +182,98 @@ export default function StuntingForm({
     }
   }, [formData.dob]);
 
-
-  // ===============================================
-  // CORE CALCULATION LOGIC
-  // ===============================================
+  // --- CALCULATION LOGIC ---
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.dob || !formData.weight || !formData.height) return;
+    if (!formData.dob || !formData.weight || !formData.height) {
+      toast.error("Mohon lengkapi semua data");
+      return;
+    }
 
     setAiLoading(true);
-    setAiError(false); // Reset error state
 
-    // A. Persiapan Data Input
     const birthDate = new Date(formData.dob);
     const today = new Date();
     const age = Math.max(0, differenceInMonths(today, birthDate));
-    
     const height = parseFloat(formData.height);
     const weight = parseFloat(formData.weight);
     const genderKey = (formData.gender === 'Laki-laki' || formData.gender === 'male') ? 'male' : 'female';
 
-    // B. Panggil Calculator Cerdas
+    // Panggil Kalkulator Cerdas
     const analysis = assessNutritionalStatus(age, weight, height, genderKey);
-
-    // C. Mapping Hasil ke UI State
-    const isWarning = analysis.color !== 'text-green-600';
+    
+    // Tentukan Warning (Jika bukan hijau, anggap warning)
+    const isWarning = !analysis.color.includes('green');
 
     setResult({
       zScore: analysis.zScore || 0,
-      zScoreLabel: analysis.zScoreLabel,
+      zScoreLabel: analysis.zScoreLabel, // Menggunakan label dinamis (TB/U atau BB/U)
       status: analysis.status,
       description: `${analysis.description} ${analysis.recommendation}`,
-      isStunting: isWarning, 
+      isStunting: isWarning,
       bmi: analysis.bmi,
       bmiStatus: analysis.category === 'Dewasa' ? analysis.status : analysis.category
     });
 
-    // D. AI GENERATION (MENGGUNAKAN SERVER ACTION)
+    // AI Generation
     try {
-      // Kita panggil fungsi di server (src/app/actions/gemini.ts)
-      const response = await generateFoodRecommendations(
-        age,
-        weight,
-        height,
-        genderKey,
-        analysis.status
-      );
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      if (response.error) {
-        console.error("AI Error:", response.error);
-        setAiError(true); // Trigger UI Error
-        setAiRecommendations([]);
-      } else {
-        setAiRecommendations(response.recommendations || []);
-      }
+      const prompt = `Berikan 3 rekomendasi menu makanan lokal Indonesia murah bergizi.
+      Profil: ${analysis.category}, Usia ${age} bln, Status: ${analysis.status}, ${analysis.recommendation}.
+      Output JSON Array: [{"name": "...", "calories": 200, "protein": 10, "fats": 5, "description": "..."}]`;
 
+      const resultAI = await model.generateContent(prompt);
+      const responseText = resultAI.response.text();
+      const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const recommendationsAI = JSON.parse(cleanedText);
+      setAiRecommendations(recommendationsAI);
     } catch (err) {
       console.error("AI Error:", err);
-      setAiError(true); // Trigger UI Error
       setAiRecommendations([]);
     }
 
     setAiLoading(false);
 
-    // E. Save to Database
+    // Save Record
     if (selectedChildId) {
       const supabase = createClient();
-      console.log('Saving growth record...');
-      
-      const { error } = await supabase.from('growth_records').insert([
-        {
-          child_id: selectedChildId,
-          age_in_months: age,
-          height: height,
-          weight: weight,
-          recorded_date: new Date().toISOString(),
-        }
-      ]);
-      
-      if (error) {
-        console.error('Error saving growth record:', error);
-        toast.error('Gagal menyimpan riwayat: ' + error.message);
-      } else {
-        toast.success('Riwayat pertumbuhan berhasil disimpan!');
-        // Update local state untuk reflect perubahan terbaru
-        setCurrentGrowthRecord({
-          child_id: selectedChildId,
-          age_in_months: age,
-          height: height,
-          weight: weight,
-          recorded_date: new Date().toISOString()
-        });
-      }
+      await supabase.from('growth_records').insert([{
+        child_id: selectedChildId,
+        age_in_months: age,
+        height: height,
+        weight: weight,
+        recorded_date: new Date().toISOString(),
+      }]);
+      toast.success('Hasil analisis berhasil disimpan!');
     }
   };
 
   const displayRecommendations = aiRecommendations.length > 0 ? aiRecommendations : staticRecommendations;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
+    <div className="flex flex-col lg:flex-row gap-8 items-start w-full max-w-6xl mx-auto">
 
-      {/* --- LEFT COLUMN: INPUT FORM --- */}
-      <div className="w-full lg:w-1/3 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 h-fit sticky top-24">
+      {/* --- KIRI: FORM INPUT (Card yang lebih bersih) --- */}
+      <div className="w-full lg:w-1/3 bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 sticky top-24">
+        
+        {/* Header Form */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Calculator size={24} className="text-[var(--primary-color)]" />
+            Cek Kondisi Anak
+          </h2>
+          {formData.ageDisplay && (
+            <span className="text-xs font-semibold bg-teal-50 text-teal-700 px-3 py-1 rounded-full border border-teal-100">
+              {formData.ageDisplay}
+            </span>
+          )}
+        </div>
 
         {/* Child Selector */}
         {childrenData && childrenData.length > 0 && (
-          <div className="mb-6 border-b border-gray-100 pb-6">
+          <div className="mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
             <ChildSelector
               childrenData={childrenData}
               selectedId={selectedChildId}
@@ -269,33 +283,22 @@ export default function StuntingForm({
           </div>
         )}
 
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 text-xl">
-            👤
-          </div>
-          <h2 className="text-xl font-bold text-gray-800">Data Si Kecil</h2>
-        </div>
-
-        <form onSubmit={handleCalculate} className="flex flex-col gap-6">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Lahir</label>
+        <form onSubmit={handleCalculate} className="flex flex-col gap-5">
+          {/* Tanggal Lahir & Gender */}
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tanggal Lahir</label>
               <input
                 type="date"
-                className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent outline-none transition-all"
+                className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent outline-none transition-all text-gray-700 font-medium"
                 value={formData.dob}
                 onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
               />
-              {formData.ageDisplay && (
-                <p className="text-sm text-[var(--primary-color)] mt-1 font-medium">
-                  Usia: {formData.ageDisplay}
-                </p>
-              )}
             </div>
-            <div className="flex-1">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Kelamin</label>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Jenis Kelamin</label>
               <select
-                className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--primary-color)] outline-none text-gray-700 font-medium"
                 value={formData.gender}
                 onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
               >
@@ -305,34 +308,37 @@ export default function StuntingForm({
             </div>
           </div>
 
+          <div className="h-[1px] bg-gray-100 my-1"></div>
+
+          {/* Berat & Tinggi (Side by Side) */}
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Berat Badan (kg)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-3.5 text-gray-400 text-sm">⚖️</span>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Berat (kg)</label>
+              <div className="relative group">
                 <input
                   type="number"
                   step="0.1"
-                  className="w-full pl-9 p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                  placeholder="11"
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent outline-none transition-all text-center text-lg font-bold text-gray-800 placeholder-gray-300"
+                  placeholder="0.0"
                   value={formData.weight}
                   onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
                 />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">kg</span>
               </div>
             </div>
 
             <div className="flex-1">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Tinggi Badan (cm)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-3.5 text-gray-400 text-sm">📏</span>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tinggi (cm)</label>
+              <div className="relative group">
                 <input
                   type="number"
                   step="0.1"
-                  className="w-full pl-9 p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                  placeholder="70"
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent outline-none transition-all text-center text-lg font-bold text-gray-800 placeholder-gray-300"
+                  placeholder="0.0"
                   value={formData.height}
                   onChange={(e) => setFormData({ ...formData, height: e.target.value })}
                 />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">cm</span>
               </div>
             </div>
           </div>
@@ -340,110 +346,133 @@ export default function StuntingForm({
           <button
             type="submit"
             disabled={aiLoading}
-            className="w-full bg-[var(--primary-color)] text-white font-bold py-3.5 rounded-lg hover:bg-teal-600 transition-colors shadow-md mt-2 disabled:opacity-70"
+            className="w-full bg-gradient-to-r from-[var(--primary-color)] to-teal-500 text-white font-bold py-4 rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all mt-4 disabled:opacity-70 disabled:scale-100 flex justify-center items-center gap-2"
           >
-            {aiLoading ? 'Menganalisis...' : 'Hitung Sekarang'}
+            {aiLoading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                Menganalisis...
+              </span>
+            ) : (
+              <>Hitung Status Gizi <ChevronRight size={18} /></>
+            )}
           </button>
         </form>
       </div>
 
-      {/* --- RIGHT COLUMN: RESULTS & RECOMMENDATIONS --- */}
-      <div className="w-full lg:w-2/3 space-y-6">
+      {/* --- KANAN: HASIL & REKOMENDASI --- */}
+      <div className="w-full lg:w-2/3 space-y-8">
 
-        {/* 1. Result Card */}
+        {/* 1. Result Card (Desain Baru) */}
         {aiLoading ? (
-          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-3xl" />
         ) : result ? (
-          <div className={`p-8 rounded-2xl border-l-8 shadow-sm transition-all duration-500 transform translate-y-0 opacity-100 ${result.isStunting ? 'bg-red-50 border-red-500' : 'bg-teal-50 border-teal-500'}`}>
-            <h3 className={`text-2xl font-bold mb-3 ${result.isStunting ? 'text-red-700' : 'text-teal-800'}`}>
-              {result.status}
-            </h3>
-            <p className="text-gray-700 leading-relaxed text-lg">
-              {result.description}
-            </p>
-            <div className="mt-6 flex flex-wrap gap-4">
-            <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
-              {/* Ubah Label Statis "Z-SCORE / INDEX" menjadi Dinamis */}
-              <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">
-                Z-Score ({result.zScoreLabel || 'Index'})
-              </span>
-              <p className="text-2xl font-black text-gray-800">{result.zScore}</p>
-            </div>
+          <div className={`relative overflow-hidden p-8 rounded-3xl transition-all duration-500 shadow-sm border ${
+            result.isStunting 
+              ? 'bg-red-50/50 border-red-100' 
+              : 'bg-teal-50/50 border-teal-100'
+          }`}>
             
-            <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
-              <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Status</span>
-              <p className="text-lg font-bold text-gray-800 leading-tight">{result.status}</p>
+            {/* Background Blob Decoration */}
+            <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl opacity-20 -mr-16 -mt-16 pointer-events-none ${
+              result.isStunting ? 'bg-red-300' : 'bg-[var(--primary-color)]'
+            }`}></div>
+
+            <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start md:items-center">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    result.isStunting 
+                      ? 'bg-red-100 text-red-600' 
+                      : 'bg-teal-100 text-teal-700'
+                  }`}>
+                    {result.status}
+                  </span>
+                </div>
+                
+                <h3 className={`text-3xl md:text-4xl font-black mb-4 ${
+                  result.isStunting ? 'text-red-700' : 'text-teal-800'
+                }`}>
+                  {result.isStunting ? 'Perlu Perhatian' : 'Tumbuh Optimal'}
+                </h3>
+                
+                <p className="text-gray-600 leading-relaxed mb-6 text-sm md:text-base bg-white/60 p-4 rounded-xl backdrop-blur-sm border border-white/50">
+                  {result.description}
+                </p>
+
+                {/* Info Chips */}
+                <div className="flex gap-3">
+                  <div className="bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">IMT / BMI</p>
+                    <p className="text-lg font-bold text-gray-800">{result.bmi}</p>
+                  </div>
+                  <div className="bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">Kategori</p>
+                    <p className="text-sm font-bold text-gray-800">{result.bmiStatus}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visual Meter (Kanan) */}
+              <div className="w-full md:w-64 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-500">Grafik Posisi</span>
+                  <Info size={14} className="text-gray-300" />
+                </div>
+                <ZScoreMeter score={result.zScore} label={result.zScoreLabel || 'Index'} />
+                <p className="text-[10px] text-gray-400 text-center mt-3 leading-tight">
+                  Posisi titik menunjukkan status gizi anak relatif terhadap standar WHO.
+                </p>
+              </div>
             </div>
-            
-            <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
-              <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">BMI</span>
-              <p className="text-2xl font-black text-gray-800">{result.bmi}</p>
-              {/* Tampilkan kategori umur di bawah BMI jika perlu */}
-              <p className="text-[10px] text-gray-500 mt-1">{result.bmiStatus}</p> 
-            </div>
-          </div>
           </div>
         ) : (
           <EmptyState
             icon={Activity}
-            title="Hasil Analisis"
-            description="Masukkan data si kecil dan tekan tombol Hitung untuk melihat hasil analisis status gizi berdasarkan standar WHO."
+            title="Siap Menganalisis?"
+            description="Masukkan data usia, berat, dan tinggi badan si kecil di panel kiri untuk melihat analisis kesehatan lengkap."
+            className="h-full min-h-[300px] bg-white border-dashed"
           />
         )}
 
-        {/* 2. Recommendations List */}
+        {/* 2. Recommendations List (Card Grid yang lebih enak dilihat) */}
         {result && (
-          <div>
-            <h3 className="font-bold text-gray-800 text-xl mb-4 flex items-center gap-2">
-              <span>🍽️</span> Rekomendasi Menu Gizi Seimbang
-              
-              {/* Badge AI */}
-              <span className="ml-auto text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full border border-indigo-100 flex items-center gap-1">
-                ✨ Powered by Gemini AI
-              </span>
+          <div className="animate-fade-in-up delay-100">
+            <h3 className="font-bold text-gray-800 text-xl mb-6 flex items-center gap-2">
+              <span className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-lg">🍽️</span>
+              Rekomendasi Menu Gizi Seimbang
             </h3>
 
             {aiLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Skeleton className="h-32 w-full rounded-2xl" />
-                <Skeleton className="h-32 w-full rounded-2xl" />
-              </div>
-            ) : aiError ? (
-              // --- TAMPILAN ERROR YANG DIMINTA ---
-              <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center justify-center text-center animate-fade-in">
-                <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-3">
-                  <AlertCircle size={24} />
-                </div>
-                <p className="text-red-700 font-bold text-lg">Maaf</p>
-                <p className="text-red-600 text-sm mt-1">Saat ini Model AI-nya tidak dapat bekerja</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}
               </div>
             ) : (
-              // --- TAMPILAN NORMAL ---
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {displayRecommendations.map((item, i) => (
-                  <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                    <div className="relative h-32 w-full bg-gray-100 flex items-center justify-center text-4xl">
+                  <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
+                    <div className="h-12 w-12 bg-teal-50 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
                       {item.image_url ? (
-                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={item.image_url} alt="" className="w-full h-full object-cover rounded-xl" />
                       ) : (
-                        <span>🥘</span>
+                        <span>🍲</span>
                       )}
                     </div>
-                    <div className="p-4">
-                      <h4 className="font-bold text-md mb-3 text-gray-800 line-clamp-1">{item.name}</h4>
-                      <div className="text-xs space-y-1 text-gray-500">
-                        <div className="flex justify-between">
-                          <span>{item.calories} Kal</span>
-                          <span className="font-medium text-gray-700">{item.protein}g P | {item.fats}g L</span>
-                        </div>
-                        <p className="italic text-[10px] mt-2 text-gray-400 line-clamp-2">{item.description}</p>
-                      </div>
+                    <h4 className="font-bold text-gray-800 mb-2 line-clamp-1 group-hover:text-[var(--primary-color)] transition-colors">
+                      {item.name}
+                    </h4>
+                    <p className="text-xs text-gray-500 mb-4 line-clamp-2 leading-relaxed">
+                      {item.description}
+                    </p>
+                    
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 pt-3 border-t border-gray-50">
+                      <span className="bg-orange-50 text-orange-600 px-2 py-1 rounded">{item.calories} Kkal</span>
+                      <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded">{item.protein}g Prot</span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-
           </div>
         )}
       </div>
