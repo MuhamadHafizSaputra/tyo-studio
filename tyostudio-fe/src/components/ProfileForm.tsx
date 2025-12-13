@@ -126,6 +126,42 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
   };
 
   return (
+    <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+
+      {/* LEFT COL: Parent & Child List */}
+      <div className="space-y-6">
+
+        {/* Parent Card */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <h2 className="text-lg font-bold text-[var(--primary-color)] mb-4">👤 Profil Bunda/Ayah</h2>
+          <form onSubmit={handleSaveParent} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Lengkap</label>
+              <input
+                type="text"
+                value={parentName}
+                onChange={(e) => setParentName(e.target.value)}
+                className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-[var(--primary-color)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+              <input type="email" value={user.email} disabled className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Lokasi Tempat Tinggal</label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-[var(--primary-color)]"
+                placeholder="Contoh: Tegal, Surabaya, Jakarta Selatan"
+              />
+            </div>
+            <button type="submit" disabled={parentLoading} className="w-full py-2 bg-[var(--primary-color)] text-white text-sm font-bold rounded-lg hover:bg-teal-600 transition">
+              {parentLoading ? 'Menyimpan...' : 'Simpan Profil Bunda'}
+            </button>
+          </form>
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full max-w-6xl mx-auto">
       
       {/* === KIRI: KARTU PROFIL ORANG TUA === */}

@@ -91,6 +91,13 @@ export default async function TrackPage({ searchParams }: { searchParams: Promis
     growthRecords = records || [];
   }
 
+  // Fetch User Profile for Location
+  const { data: userProfile } = await supabase
+    .from('users')
+    .select('location')
+    .eq('id', user.id)
+    .single();
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans pb-20">
       <main className="container mx-auto px-4 py-8">
@@ -102,6 +109,7 @@ export default async function TrackPage({ searchParams }: { searchParams: Promis
           child={selectedChild}
           allChildren={allChildren}
           growthRecords={growthRecords}
+          userLocation={userProfile?.location || 'Indonesia'}
         />
 
       </main>

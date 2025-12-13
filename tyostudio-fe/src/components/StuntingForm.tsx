@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateFoodRecommendations } from '@/app/actions/gemini';
 import { differenceInMonths } from "date-fns";
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Activity } from 'lucide-react';
@@ -170,7 +170,7 @@ export default function StuntingForm({
     const today = new Date();
     // Hitung umur bulan (cegah nilai negatif)
     const age = Math.max(0, differenceInMonths(today, birthDate));
-    
+
     const height = parseFloat(formData.height);
     const weight = parseFloat(formData.weight);
     const genderKey = (formData.gender === 'Laki-laki' || formData.gender === 'male') ? 'male' : 'female';
@@ -186,48 +186,37 @@ export default function StuntingForm({
       zScore: analysis.zScore || 0, 
       status: analysis.status,
       description: `${analysis.description} ${analysis.recommendation}`,
-      isStunting: isWarning, 
+      isStunting: isWarning,
       bmi: analysis.bmi,
       bmiStatus: analysis.category === 'Dewasa' ? analysis.status : analysis.category,
       zScoreLabel: analysis.zScoreLabel // Menyimpan label dinamis
     });
 
-    // D. AI GENERATION
+    // D. AI GENERATION (Secure Server Action)
     try {
-      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const res = await generateFoodRecommendations(
+        age,
+        weight,
+        height,
+        formData.gender,
+        analysis.status,
+        userLocation, // Optional, defaults to 'Indonesia' if undefined
+        selectedChildId
+      );
 
-      const prompt = `Berikan 3 rekomendasi menu makanan lokal Indonesia yang murah dan bergizi.
-      
-      Profil Pengguna:
-      - Kategori: ${analysis.category}
-      - Usia: ${age} bulan
-      - Kondisi Kesehatan: ${analysis.status} (Z-Score: ${analysis.zScore || '-'})
-      - Berat: ${weight} kg, Tinggi: ${height} cm
-      - Saran Medis Awal: ${analysis.recommendation}
-      - Lokasi: ${userLocation || 'Indonesia'}
-      
-      Output HARUS JSON Array valid (tanpa markdown block):
-      [
-        {
-          "name": "Nama Menu",
-          "calories": 200,
-          "protein": 10,
-          "fats": 5,
-          "description": "Alasan kenapa menu ini cocok (max 15 kata)."
+      if (res.error) {
+        toast.error(res.error);
+        setAiRecommendations([]);
+      } else if (res.recommendations) {
+        setAiRecommendations(res.recommendations);
+        if (res.isFallback) {
+          toast.info('Info: Limit API tercapai. Menggunakan mode offline.');
         }
-      ]`;
-
-      const resultAI = await model.generateContent(prompt);
-      const responseText = resultAI.response.text();
-      const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const recommendationsAI = JSON.parse(cleanedText);
-
-      setAiRecommendations(recommendationsAI);
+      }
     } catch (err) {
       console.error("AI Error:", err);
       toast.error('Gagal mendapatkan rekomendasi AI. Menggunakan rekomendasi standar.');
-      setAiRecommendations([]); // Fallback to static
+      setAiRecommendations([]);
     }
 
     setAiLoading(false);
@@ -236,7 +225,8 @@ export default function StuntingForm({
     if (selectedChildId) {
       const supabase = createClient();
       console.log('Saving growth record...');
-      
+
+      // Kita simpan record meskipun mungkin logic DB belum punya kolom z_score
       const { error } = await supabase.from('growth_records').insert([
         {
           child_id: selectedChildId,
@@ -246,7 +236,7 @@ export default function StuntingForm({
           recorded_date: new Date().toISOString(),
         }
       ]);
-      
+
       if (error) {
         console.error('Error saving growth record:', error);
         toast.error('Gagal menyimpan riwayat: ' + error.message);
