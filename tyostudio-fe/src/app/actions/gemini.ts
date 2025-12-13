@@ -1,26 +1,66 @@
 'use server';
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+// import { GoogleGenerativeAI } from '@google/generative-ai'; // Removed for Groq
+import { createClient } from '@/utils/supabase/server';
+import { FALLBACK_RECOMMENDATIONS } from '@/constants/foodDefaults';
 
-const apiKey = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey || '');
+// const GROQ_API_KEY = process.env.GROQ_API_KEY; // Replaced by rotation logic
 
 export async function generateFoodRecommendations(
   age: number,
   weight: number,
   height: number,
   gender: string,
-  status: string
-) {
-  if (!apiKey) {
-    console.error('Gemini API Key is missing');
+  status: string,
+  location: string = 'Indonesia',
+  childId?: string
+): Promise<{ recommendations: any[], error?: string, isFallback?: boolean, suppressNotification?: boolean }> {
+
+  // 1. Check Cache
+  if (childId) {
+    const supabase = await createClient();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: cachedData } = await supabase
+      .from('child_recommendations')
+      .select('recommendations, created_at')
+      .eq('child_id', childId)
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (cachedData && cachedData.recommendations) {
+      console.log(`[Groq] Returning cached recommendations for child ${childId}`);
+      return { recommendations: cachedData.recommendations };
+    }
+  }
+
+  // 2. Auth Check & Fallback for Non-Logged In Users
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    console.log('[Groq] User not logged in, returning static fallback recommendations.');
     return {
-      error: 'Konfigurasi API Key belum terpasang. Hubungi administrator.',
-      recommendations: []
+      recommendations: FALLBACK_RECOMMENDATIONS,
+      isFallback: false,
+      suppressNotification: true // Signal frontend to stay silent
     };
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  // 3. API Key Rotation Logic
+  const apiKeys = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
+
+  if (apiKeys.length === 0) {
+    console.error('No Groq API keys found.');
+    return {
+      error: 'Konfigurasi API Key (Groq) belum terpasang.',
+      recommendations: FALLBACK_RECOMMENDATIONS, // Return fallback so app works
+      isFallback: true
+    };
+  }
 
   const prompt = `
     Bertindaklah sebagai ahli gizi anak profesional.
@@ -30,39 +70,107 @@ export async function generateFoodRecommendations(
     - Tinggi: ${height} cm
     - Jenis Kelamin: ${gender}
     - Status Gizi (Z-Score): ${status}
+    - Lokasi/Kota Tempat Tinggal: ${location}
 
-    Menu harus disesuaikan dengan status gizinya (misal: jika stunting/kurus, fokus tinggi protein & kalori).
-    Gunakan bahan makanan lokal Indonesia yang mudah didapat dan terjangkau.
+    PENTING:
+    1. Menu HARUS disesuaikan dengan status gizinya.
+    2. Berikan prioritas pada MAKANAN LOKAL daerah "${location}".
+    3. Bahan makanan mudah didapat.
     
-    Format output HARUS berupa JSON array murni tanpa markdown block code. 
-    Setiap objek dalam array memiliki properti:
-    - name: Nama hidangan (String)
-    - calories: Perkiraan kalori (Number/String)
-    - protein: Perkiraan protein dalam gram (String)
-    - fats: Perkiraan lemak dalam gram (String)
-    - description: Penjelasan singkat kenapa menu ini bagus (String)
-
-    Contoh output yang diharapkan:
+    OUTPUT JSON FORMAT ONLY:
     [
-      { "name": "Bubur Ikan Kembung", "calories": "200", "protein": "15", "fats": "5", "description": "Tinggi protein hewani untuk pertumbuhan." },
-      ...
+      { "name": "Nama Menu", "calories": "200", "protein": "10", "fats": "5", "description": "Alasan..." }
     ]
   `;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+  let lastError: any = null;
 
-    // Clean up potential markdown code blocks if the model adds them
-    let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  for (const key of apiKeys) {
+    try {
+      console.log(`[Groq] Attempting generation with key ending in...${key.slice(-4)}`);
 
-    const recommendations = JSON.parse(cleanText);
-    return { recommendations };
-  } catch (error) {
-    console.error('Error generating recommendations:', error);
-    return {
-      error: 'Gagal membuat rekomendasi menu. Silakan coba lagi nanti.',
-      recommendations: []
-    };
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile", // Latest supported model
+          messages: [
+            { role: "system", content: "You are a helpful nutritionist API that outputs only valid JSON." },
+            { role: "user", content: prompt }
+          ],
+          // response_format: { type: "json_object" }, // Removed to avoid 400 errors
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(`[Groq] API Error Body: ${errorBody}`);
+        throw new Error(`Groq API Error: ${response.status} ${response.statusText} - ${errorBody}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (!content) {
+        throw new Error('No content received from Groq');
+      }
+
+      // Parse JSON
+      let recommendations;
+      try {
+        // Handle case where Llama might wrap in { "recommendations": [...] } or just [...]
+        const parsed = JSON.parse(content);
+        recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || parsed.menu || []);
+
+        if (!Array.isArray(recommendations) || recommendations.length === 0) {
+          // Fallback parsing strategy if structure is unexpected
+          console.warn('[Groq] Unexpected JSON structure:', parsed);
+          throw new Error('Invalid JSON structure');
+        }
+      } catch (e) {
+        console.error('[Groq] JSON Parse Error:', e);
+        // Last ditch effort to find array in string if "json_object" mode wasn't perfect
+        const match = content.match(/\[[\s\S]*\]/);
+        if (match) {
+          recommendations = JSON.parse(match[0]);
+        } else {
+          throw e;
+        }
+      }
+
+      // 3. Save to Cache
+      if (childId && recommendations.length > 0) {
+        const supabase = await createClient();
+        await supabase.from('child_recommendations').insert({
+          child_id: childId,
+          recommendations: recommendations
+        });
+        console.log(`[Groq] Cached new recommendations for child ${childId}`);
+      }
+
+      // Success! Return
+      return { recommendations };
+
+    } catch (error: any) {
+      console.warn(`[Groq] Error with key ...${key.slice(-4)}: ${error.message}`);
+      lastError = error;
+
+      // Continue to next key if it's an API error
+      console.log('-> API Error, switching to next key...');
+      continue;
+    }
   }
+
+  // If we get here, all keys failed
+  console.error('[Groq] All keys exhausted.', lastError);
+  return {
+    recommendations: FALLBACK_RECOMMENDATIONS,
+    isFallback: true,
+    error: lastError?.message
+  };
+
 }

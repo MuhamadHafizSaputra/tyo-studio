@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
@@ -11,12 +11,15 @@ import AddGrowthRecordModal from './AddGrowthRecordModal';
 import { ClipboardList, PlusCircle, Trash2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
+import { generateFoodRecommendations } from '@/app/actions/gemini';
+import { Loader2, MapPin, Sparkles } from 'lucide-react';
 
 interface TrackerDashboardProps {
   user: any;
   child: any;
   allChildren?: any[];
   growthRecords: any[];
+  userLocation?: string;
 }
 
 // --- DATA STANDARD WHO (Simplified for Demo) ---
@@ -83,10 +86,17 @@ const CustomTooltip = ({ active, payload, label, mode }: any) => {
   return null;
 };
 
-export default function TrackerDashboard({ user, child, allChildren, growthRecords }: TrackerDashboardProps) {
+export default function TrackerDashboard({ user, child, allChildren, growthRecords, userLocation = 'Indonesia' }: TrackerDashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'height' | 'weight' | 'zscore'>('height');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Recommendations State
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
+  const [errorRecs, setErrorRecs] = useState<string | null>(null);
+  const fetchingRef = React.useRef(false);
 
   // Handle Child Switch
   const handleChildSelect = (childId: string) => {
@@ -196,7 +206,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase tracking-wide">{child?.gender || '-'}</span>
               {child?.date_of_birth && (
                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  🎂 {new Date(child.date_of_birth).toLocaleDateString()}
+                  🎂 {new Date(child.date_of_birth).toLocaleDateString('id-ID')}
                 </span>
               )}
             </div>
@@ -342,61 +352,81 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         {/* --- AREA KANAN (MENU REKOMENDASI) --- */}
         <div className="h-full">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col max-h-[500px]">
-            <h3 className="font-bold text-gray-800 mb-5 text-sm tracking-widest uppercase border-b pb-2 border-gray-50 shrink-0">
-              🍽️ Menu Rekomendasi
-            </h3>
+            <div className="flex justify-between items-center mb-5 border-b border-gray-50 pb-2 shrink-0">
+              <h3 className="font-bold text-gray-800 text-sm tracking-widest uppercase">
+                🍽️ Menu Rekomendasi
+              </h3>
+              {userLocation && (
+                <div className="flex items-center gap-1 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded-full">
+                  <MapPin size={12} />
+                  <span className="font-bold truncate max-w-[100px]">{userLocation}</span>
+                </div>
+              )}
+            </div>
 
             <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🐟</span>
+              {/* Empty State / Initial Loading if no records */}
+              {!loadingRecs && !errorRecs && recommendations.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center p-4 opacity-70">
+                  <div className="text-3xl mb-2 grayscale">🥘</div>
+                  <p className="text-xs text-gray-500 max-w-[200px] leading-relaxed">
+                    {growthRecords.length === 0
+                      ? "Catat data tumbuh kembang dulu untuk dapat rekomendasi."
+                      : "Menyiapkan rekomendasi menu..."}
+                  </p>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Ikan Kembung Kuah Asam</h4>
-                  <p className="text-xs text-gray-500 mt-1">Mengandung Omega-3 tinggi untuk perkembangan otak & protein.</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥛</span>
+              {/* Error State */}
+              {errorRecs && (
+                <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                  <div className="text-3xl mb-2">⚠️</div>
+                  <p className="text-xs text-red-500 mb-4 max-w-[200px]">
+                    {errorRecs || "Gagal memuat rekomendasi."}
+                  </p>
+                  <button
+                    onClick={handleRetry}
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition"
+                  >
+                    Coba Lagi
+                  </button>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Susu Tinggi Kalori</h4>
-                  <p className="text-xs text-gray-500 mt-1">Tambahan 2 gelas sehari untuk mengejar berat badan.</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥑</span>
+              {(loadingRecs || (recommendations.length === 0 && !hasGenerated && !errorRecs && growthRecords.length > 0)) && ( /* Skeleton Loading */
+                <div className="space-y-4 animate-pulse">
+                  <div className="flex gap-2 items-center text-teal-600 text-xs font-bold mb-2">
+                    <Sparkles size={14} className="animate-spin" />
+                    Sedang meracik menu untuk si kecil...
+                  </div>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex gap-4 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="w-12 h-12 bg-gray-200 rounded-lg shrink-0"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Alpukat Kerok Susu</h4>
-                  <p className="text-xs text-gray-500 mt-1">Lemak sehat tinggi kalori yang mudah dicerna balita.</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥩</span>
+              {recommendations.map((item, idx) => (
+                <div key={idx} className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100 animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                  <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-lg flex items-center justify-center text-2xl shrink-0 shadow-sm border border-orange-100">
+                    {idx === 0 ? '🍳' : idx === 1 ? '🍱' : idx === 2 ? '🥗' : '🥣'}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.description}</p>
+                    <div className="flex gap-2 mt-2">
+                      <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-bold border border-orange-100">🔥 {item.calories} kkal</span>
+                      <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">💪 P: {item.protein}g</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Bola Daging Cincang</h4>
-                  <p className="text-xs text-gray-500 mt-1">Sumber zat besi dan protein hewani yang sangat baik.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100">
-                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                  <span>🥣</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Bubur Kacang Hijau</h4>
-                  <p className="text-xs text-gray-500 mt-1">Snack sehat kaya serat dan vitamin B kompleks.</p>
-                </div>
-              </div>
+              ))}
 
             </div>
           </div>

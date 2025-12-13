@@ -200,16 +200,13 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Lokasi Tempat Tinggal</label>
-              <select
+              <input
+                type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
-              >
-                <option value="Perkotaan">Perkotaan (Kota Besar)</option>
-                <option value="Pedesaan">Pedesaan (Darat)</option>
-                <option value="Pesisir">Pesisir (Pantai/Laut)</option>
-                <option value="Pegunungan">Pegunungan (Dataran Tinggi)</option>
-              </select>
+                className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-[var(--primary-color)]"
+                placeholder="Contoh: Tegal, Surabaya, Jakarta Selatan"
+              />
             </div>
             <button type="submit" disabled={parentLoading} className="w-full py-2 bg-[var(--primary-color)] text-white text-sm font-bold rounded-lg hover:bg-teal-600 transition">
               {parentLoading ? 'Menyimpan...' : 'Simpan Profil Bunda'}
