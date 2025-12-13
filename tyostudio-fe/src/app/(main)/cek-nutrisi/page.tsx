@@ -15,6 +15,14 @@ const AKG_FALLBACK = {
 };
 
 // ... existing interfaces ...
+interface FoodItem {
+    name: string;
+    cal: number;
+    prot: number;
+    carb: number;
+    fat: number;
+    count: number;
+}
 
 export default function CekNutrisiPage() {
     const supabase = createClient();
