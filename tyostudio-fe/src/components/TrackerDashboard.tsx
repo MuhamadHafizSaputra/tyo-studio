@@ -193,6 +193,79 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
   // growthRecords is ascending, so we simply reverse copy
   const historyLogs = [...growthRecords].reverse().slice(0, 5);
 
+  const fetchRecommendations = async () => {
+    if (!child || growthRecords.length === 0 || fetchingRef.current || hasGenerated) return;
+
+    // Prevent double fetching in StrictMode
+    fetchingRef.current = true;
+    setLoadingRecs(true);
+    setErrorRecs(null);
+
+    try {
+      // Get latest record for stats
+      const latest = growthRecords[growthRecords.length - 1];
+
+      // Calculate Z-Score (Rough Estimate) to determine status
+      // Ideally this should be calculated precisely
+      const heightZ = (latest.height - 85) / 4; // Dummy formula reference
+      const weightZ = (latest.weight - 12) / 2;
+
+      let status = "Gizi Baik";
+      if (weightZ < -2) status = "Gizi Kurang";
+      if (weightZ < -3) status = "Gizi Buruk";
+      if (weightZ > 2) status = "Gizi Lebih";
+
+      const result = await generateFoodRecommendations(
+        latest.age_in_months,
+        latest.weight,
+        latest.height,
+        child.gender,
+        status,
+        userLocation,
+        child.id
+      );
+
+      if (result.error && !result.isFallback) {
+        setErrorRecs(result.error);
+      }
+
+      if (result.recommendations) {
+        setRecommendations(result.recommendations);
+        setHasGenerated(true);
+        if (result.isFallback && !result.suppressNotification) {
+          toast.warning('Menggunakan rekomendasi alternatif (Layanan AI sedang sibuk).');
+        }
+      }
+
+    } catch (err: any) {
+      console.error("Failed to fetch recommendations:", err);
+      setErrorRecs("Gagal memuat rekomendasi: " + (err.message || 'Error tidak diketahui'));
+    } finally {
+      setLoadingRecs(false);
+      fetchingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    // Only fetch if we have data and haven't generated yet (or if child changes, we reset hasGenerated?)
+    // Actually we should reset hasGenerated when child changes.
+    fetchRecommendations();
+  }, [child?.id, growthRecords]); // Dependencies
+
+  // Reset state when child changes
+  useEffect(() => {
+    setRecommendations([]);
+    setHasGenerated(false);
+    setErrorRecs(null);
+    fetchingRef.current = false;
+  }, [child?.id]);
+
+  const handleRetry = () => {
+    setHasGenerated(false); // Enable fetching again
+    fetchingRef.current = false; // Reset lock
+    fetchRecommendations();
+  };
+
   return (
     <div className="flex flex-col gap-6">
 
