@@ -26,18 +26,11 @@ export default function NavUserMenu({ user }: NavUserMenuProps) {
             {user.user_metadata?.full_name ? user.user_metadata.full_name[0].toUpperCase() : 'U'}
           </div>
           <div className="hidden md:block">
-            <p className="text-xs text-gray-500 leading-none">Halo,</p>
             <p className="text-sm font-bold text-gray-700 leading-none hover:text-[var(--primary-color)]">
-              {user.user_metadata?.full_name || 'Bunda'}
+              Halo, {user.user_metadata?.full_name || 'Bunda'}
             </p>
           </div>
         </Link>
-        <button
-          onClick={handleLogout}
-          className="text-sm font-bold text-gray-400 hover:text-red-500 transition px-3 py-1 bg-gray-50 rounded-md border border-gray-100"
-        >
-          Keluar
-        </button>
       </div>
     );
   }
