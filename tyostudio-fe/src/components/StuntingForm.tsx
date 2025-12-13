@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// Import Server Action
+import { generateFoodRecommendations } from '@/app/actions/gemini'; 
+
 import { differenceInMonths } from "date-fns";
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Activity } from 'lucide-react';
+import { Activity, AlertCircle } from 'lucide-react'; // Tambah AlertCircle
 import { Skeleton } from '@/components/ui/Skeleton';
 import ChildSelector from './ChildSelector';
 import { toast } from 'sonner';
-
-// --- IMPORT BARU (LOGIKA CERDAS KATEGORI UMUR) ---
 import { assessNutritionalStatus } from '@/lib/calculator';
 
 const initialRecord = {
@@ -50,15 +50,17 @@ export default function StuntingForm({
 
   const [result, setResult] = useState<{
     zScore: number;
+    zScoreLabel?: string;
     status: string;
     description: string;
-    isStunting: boolean; // Flag untuk menentukan warna box (Merah/Hijau)
+    isStunting: boolean;
     bmi: number;
     bmiStatus: string;
   } | null>(null);
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
+  const [aiError, setAiError] = useState(false); // STATE ERROR AI
 
   // Static Fallback Recommendations
   const staticRecommendations = [
@@ -100,7 +102,7 @@ export default function StuntingForm({
     if (selectedChildId) {
       const fetchLastRecord = async () => {
         const supabase = createClient();
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('growth_records')
           .select('*')
           .eq('child_id', selectedChildId)
@@ -154,89 +156,72 @@ export default function StuntingForm({
 
 
   // ===============================================
-  // CORE CALCULATION LOGIC (UPDATED)
+  // CORE CALCULATION LOGIC
   // ===============================================
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.dob || !formData.weight || !formData.height) return;
 
     setAiLoading(true);
+    setAiError(false); // Reset error state
 
     // A. Persiapan Data Input
     const birthDate = new Date(formData.dob);
     const today = new Date();
-    // Hitung umur bulan (cegah nilai negatif)
     const age = Math.max(0, differenceInMonths(today, birthDate));
     
     const height = parseFloat(formData.height);
     const weight = parseFloat(formData.weight);
     const genderKey = (formData.gender === 'Laki-laki' || formData.gender === 'male') ? 'male' : 'female';
 
-    // B. Panggil Calculator Cerdas (Otomatis deteksi Balita/Anak/Dewasa)
+    // B. Panggil Calculator Cerdas
     const analysis = assessNutritionalStatus(age, weight, height, genderKey);
 
     // C. Mapping Hasil ke UI State
-    // Menentukan apakah status "berbahaya" (Merah/Orange) atau "aman" (Hijau)
-    // Kita anggap aman jika warnanya hijau, selain itu warning.
     const isWarning = analysis.color !== 'text-green-600';
 
     setResult({
-      zScore: analysis.zScore || 0, // Dewasa mungkin tidak ada Z-Score
+      zScore: analysis.zScore || 0,
+      zScoreLabel: analysis.zScoreLabel,
       status: analysis.status,
-      // Gabungkan deskripsi dan saran medis agar tampil di kartu hasil
       description: `${analysis.description} ${analysis.recommendation}`,
       isStunting: isWarning, 
       bmi: analysis.bmi,
-      // Jika kategori Balita, tampilkan kategori umurnya di label BMI
       bmiStatus: analysis.category === 'Dewasa' ? analysis.status : analysis.category
     });
 
-    // D. AI GENERATION (Prompt Diperbarui agar lebih spesifik)
+    // D. AI GENERATION (MENGGUNAKAN SERVER ACTION)
     try {
-      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // Kita panggil fungsi di server (src/app/actions/gemini.ts)
+      const response = await generateFoodRecommendations(
+        age,
+        weight,
+        height,
+        genderKey,
+        analysis.status
+      );
 
-      const prompt = `Berikan 3 rekomendasi menu makanan lokal Indonesia yang murah dan bergizi.
-      
-      Profil Pengguna:
-      - Kategori: ${analysis.category}
-      - Usia: ${age} bulan
-      - Kondisi Kesehatan: ${analysis.status} (Z-Score: ${analysis.zScore || '-'})
-      - Berat: ${weight} kg, Tinggi: ${height} cm
-      - Saran Medis Awal: ${analysis.recommendation}
-      - Lokasi: ${userLocation || 'Indonesia'}
-      
-      Output HARUS JSON Array valid (tanpa markdown block):
-      [
-        {
-          "name": "Nama Menu",
-          "calories": 200,
-          "protein": 10,
-          "fats": 5,
-          "description": "Alasan kenapa menu ini cocok (max 15 kata)."
-        }
-      ]`;
+      if (response.error) {
+        console.error("AI Error:", response.error);
+        setAiError(true); // Trigger UI Error
+        setAiRecommendations([]);
+      } else {
+        setAiRecommendations(response.recommendations || []);
+      }
 
-      const resultAI = await model.generateContent(prompt);
-      const responseText = resultAI.response.text();
-      const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const recommendationsAI = JSON.parse(cleanedText);
-
-      setAiRecommendations(recommendationsAI);
     } catch (err) {
       console.error("AI Error:", err);
-      toast.error('Gagal mendapatkan rekomendasi AI. Menggunakan rekomendasi standar.');
-      setAiRecommendations([]); // Fallback to static
+      setAiError(true); // Trigger UI Error
+      setAiRecommendations([]);
     }
 
     setAiLoading(false);
 
-    // E. Save to Database (Tetap jalan seperti semula)
+    // E. Save to Database
     if (selectedChildId) {
       const supabase = createClient();
       console.log('Saving growth record...');
       
-      // Kita simpan record meskipun mungkin logic DB belum punya kolom z_score
       const { error } = await supabase.from('growth_records').insert([
         {
           child_id: selectedChildId,
@@ -244,7 +229,6 @@ export default function StuntingForm({
           height: height,
           weight: weight,
           recorded_date: new Date().toISOString(),
-          // z_score: analysis.zScore (Bisa di-uncomment jika kolom DB sudah ada)
         }
       ]);
       
@@ -253,6 +237,7 @@ export default function StuntingForm({
         toast.error('Gagal menyimpan riwayat: ' + error.message);
       } else {
         toast.success('Riwayat pertumbuhan berhasil disimpan!');
+        // Update local state untuk reflect perubahan terbaru
         setCurrentGrowthRecord({
           child_id: selectedChildId,
           age_in_months: age,
@@ -264,7 +249,6 @@ export default function StuntingForm({
     }
   };
 
-  // Determine which recommendations to show
   const displayRecommendations = aiRecommendations.length > 0 ? aiRecommendations : staticRecommendations;
 
   return (
@@ -378,20 +362,26 @@ export default function StuntingForm({
               {result.description}
             </p>
             <div className="mt-6 flex flex-wrap gap-4">
-              <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
-                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Z-Score / Index</span>
-                <p className="text-2xl font-black text-gray-800">{result.zScore}</p>
-              </div>
-              <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
-                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Status</span>
-                <p className="text-lg font-bold text-gray-800 leading-tight">{result.status}</p>
-              </div>
-              <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
-                <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">BMI</span>
-                <p className="text-2xl font-black text-gray-800">{result.bmi}</p>
-                <p className="text-xs text-gray-600 font-medium">{result.bmiStatus}</p>
-              </div>
+            <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
+              {/* Ubah Label Statis "Z-SCORE / INDEX" menjadi Dinamis */}
+              <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">
+                Z-Score ({result.zScoreLabel || 'Index'})
+              </span>
+              <p className="text-2xl font-black text-gray-800">{result.zScore}</p>
             </div>
+            
+            <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
+              <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Status</span>
+              <p className="text-lg font-bold text-gray-800 leading-tight">{result.status}</p>
+            </div>
+            
+            <div className="bg-white/60 p-3 rounded-lg flex-1 min-w-[100px]">
+              <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">BMI</span>
+              <p className="text-2xl font-black text-gray-800">{result.bmi}</p>
+              {/* Tampilkan kategori umur di bawah BMI jika perlu */}
+              <p className="text-[10px] text-gray-500 mt-1">{result.bmiStatus}</p> 
+            </div>
+          </div>
           </div>
         ) : (
           <EmptyState
@@ -406,6 +396,11 @@ export default function StuntingForm({
           <div>
             <h3 className="font-bold text-gray-800 text-xl mb-4 flex items-center gap-2">
               <span>🍽️</span> Rekomendasi Menu Gizi Seimbang
+              
+              {/* Badge AI */}
+              <span className="ml-auto text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full border border-indigo-100 flex items-center gap-1">
+                ✨ Powered by Gemini AI
+              </span>
             </h3>
 
             {aiLoading ? (
@@ -413,7 +408,17 @@ export default function StuntingForm({
                 <Skeleton className="h-32 w-full rounded-2xl" />
                 <Skeleton className="h-32 w-full rounded-2xl" />
               </div>
+            ) : aiError ? (
+              // --- TAMPILAN ERROR YANG DIMINTA ---
+              <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center justify-center text-center animate-fade-in">
+                <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-3">
+                  <AlertCircle size={24} />
+                </div>
+                <p className="text-red-700 font-bold text-lg">Maaf</p>
+                <p className="text-red-600 text-sm mt-1">Saat ini Model AI-nya tidak dapat bekerja</p>
+              </div>
             ) : (
+              // --- TAMPILAN NORMAL ---
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {displayRecommendations.map((item, i) => (
                   <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">

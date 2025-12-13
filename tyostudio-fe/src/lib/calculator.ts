@@ -1,70 +1,114 @@
 import { getLMSData } from './whoData';
 
-// Tipe Data Hasil Analisis
+// Tipe Data Hasil Analisis Diperbarui
 export type AnalysisResult = {
   category: 'Balita (0-5 Tahun)' | 'Anak/Remaja (5-19 Tahun)' | 'Dewasa';
   bmi: number;
-  zScore?: number; // Optional karena Dewasa tidak butuh Z-Score
+  zScore?: number;
+  zScoreLabel?: string; // Tambahan label (BB/U atau TB/U)
   status: string;
   color: string;
   description: string;
   recommendation: string;
 };
 
+// --- Helper Rumus LMS ---
+function calculateLMS(val: number, L: number, M: number, S: number) {
+  if (Math.abs(L) < 0.01) return Math.log(val / M) / S;
+  return (Math.pow(val / M, L) - 1) / (L * S);
+}
+
 // ==========================================
-// 1. RUMUS KHUSUS BALITA (0 - 60 Bulan) - Menggunakan LMS
+// 1. RUMUS KHUSUS BALITA (0 - 60 Bulan)
 // ==========================================
 function analyzeToddler(ageMonths: number, weight: number, height: number, gender: 'male' | 'female'): AnalysisResult {
-  // Hitung Z-Score Berat Badan (Weight-for-Age)
-  const wfaData = getLMSData(ageMonths, gender, 'weight');
+  
+  // A. SANITY CHECK (Cegah input tidak logis)
+  if (height > 150 || height < 30) {
+    return {
+      category: 'Balita (0-5 Tahun)',
+      bmi: 0,
+      zScore: 0,
+      status: 'Data Tinggi Tidak Valid',
+      color: 'text-gray-500',
+      description: 'Tinggi badan di luar rentang wajar balita (30-150 cm).',
+      recommendation: 'Mohon periksa kembali input tinggi badan.'
+    };
+  }
+  
+  // B. Hitung Z-Score
+  const wfaData = getLMSData(ageMonths, gender, 'weight'); // Berat menurut Umur
   const zScoreWeight = calculateLMS(weight, wfaData.L, wfaData.M, wfaData.S);
 
-  // Hitung Z-Score Tinggi Badan (Height-for-Age)
-  const hfaData = getLMSData(ageMonths, gender, 'height');
+  const hfaData = getLMSData(ageMonths, gender, 'height'); // Tinggi menurut Umur
   const zScoreHeight = calculateLMS(height, hfaData.L, hfaData.M, hfaData.S);
 
-  // Logika Status Gizi (Kombinasi Berat & Tinggi)
-  let status = 'Gizi Baik';
-  let color = 'text-green-600';
-  let desc = 'Tumbuh kembang anak sesuai dengan usianya.';
-  let rec = 'Pertahankan pola makan gizi seimbang dan pantau terus setiap bulan.';
+  // Hitung BMI (sekedar data tambahan)
+  const heightM = height / 100;
+  const bmi = parseFloat((weight / (heightM * heightM)).toFixed(1));
 
-  // Prioritas Deteksi: Stunting (Tinggi) > Gizi Buruk (Berat)
+  // C. LOGIKA PENENTUAN STATUS & Z-SCORE YANG DITAMPILKAN
+  // Default: Gizi Baik (Tampilkan BB/U karena lebih fluktuatif/sensitif untuk nutrisi)
+  let status = 'Gizi Baik (Normal)';
+  let color = 'text-green-600';
+  let desc = 'Berat dan tinggi badan ideal sesuai usia.';
+  let rec = 'Pertahankan pola makan gizi seimbang.';
+  let displayZScore = zScoreWeight; // Default tampilkan BB/U
+  let displayLabel = 'BB/U'; // Label Berat/Umur
+
+  // 1. Cek Stunting (Prioritas Tinggi - Masalah Kronis)
   if (zScoreHeight < -3) {
     status = 'Sangat Pendek (Severely Stunted)';
     color = 'text-red-700';
-    desc = 'Tinggi badan sangat jauh di bawah standar. Berisiko gangguan pertumbuhan jangka panjang.';
-    rec = 'Segera konsultasikan ke dokter spesialis anak. Perlu intervensi gizi khusus (Tinggi Protein & Mikronutrien).';
+    desc = 'Tinggi badan sangat kurang. Indikasi gangguan pertumbuhan jangka panjang.';
+    rec = 'Segera konsultasi ke Dokter Spesialis Anak. Perlu intervensi gizi & stimulasi.';
+    displayZScore = zScoreHeight;
+    displayLabel = 'TB/U'; // Tampilkan TB/U karena ini masalah utamanya
   } else if (zScoreHeight < -2) {
     status = 'Pendek (Stunted)';
     color = 'text-orange-600';
     desc = 'Tinggi badan di bawah rata-rata anak seusianya.';
-    rec = 'Perbaiki asupan protein hewani (telur, ikan, daging) dan pastikan tidur cukup. Cek juga penyerapan gizi.';
-  } else if (zScoreWeight < -3) {
+    rec = 'Perbaiki asupan protein hewani (telur, ikan, daging), susu, dan tidur cukup.';
+    displayZScore = zScoreHeight;
+    displayLabel = 'TB/U';
+  } else if (zScoreHeight > 3) {
+    status = 'Tinggi Lebih (Tall)';
+    color = 'text-purple-600';
+    desc = 'Tinggi badan jauh di atas rata-rata.';
+    rec = 'Biasanya genetik, namun konsultasikan jika pertumbuhan terlalu drastis.';
+    displayZScore = zScoreHeight;
+    displayLabel = 'TB/U';
+  }
+  // 2. Cek Berat Badan (Masalah Akut)
+  // Jika tinggi normal, cek apakah beratnya bermasalah
+  else if (zScoreWeight < -3) {
     status = 'Gizi Buruk (Severely Underweight)';
     color = 'text-red-600';
-    desc = 'Berat badan sangat kurang. Berbahaya bagi perkembangan otak dan fisik.';
-    rec = 'Butuh Makanan Tambahan (PMT) padat kalori segera. Rujuk ke Puskesmas/Dokter.';
+    desc = 'Berat badan sangat kurang. Berbahaya bagi perkembangan otak.';
+    rec = 'Butuh Makanan Tambahan (PMT) padat kalori segera. Rujuk ke Puskesmas.';
+    displayZScore = zScoreWeight;
+    displayLabel = 'BB/U';
   } else if (zScoreWeight < -2) {
     status = 'Gizi Kurang (Underweight)';
     color = 'text-orange-500';
     desc = 'Berat badan kurang dari standar.';
-    rec = 'Tambah porsi makan, berikan camilan padat gizi, dan gunakan lemak tambahan (minyak/santan) pada makanan.';
+    rec = 'Tambah porsi makan, double protein hewani, dan lemak tambahan.';
+    displayZScore = zScoreWeight;
+    displayLabel = 'BB/U';
   } else if (zScoreWeight > 2) {
     status = 'Risiko Gizi Lebih';
     color = 'text-yellow-600';
-    desc = 'Berat badan di atas rata-rata.';
-    rec = 'Kurangi makanan manis/gula. Perbanyak aktivitas fisik bermain.';
+    desc = 'Berat badan berlebih dibanding usia.';
+    rec = 'Kurangi gula/garam dan makanan manis. Perbanyak aktivitas fisik.';
+    displayZScore = zScoreWeight;
+    displayLabel = 'BB/U';
   }
-
-  // Hitung BMI sekedar data tambahan
-  const heightM = height / 100;
-  const bmi = parseFloat((weight / (heightM * heightM)).toFixed(1));
 
   return {
     category: 'Balita (0-5 Tahun)',
     bmi,
-    zScore: parseFloat(zScoreHeight.toFixed(2)),
+    zScore: parseFloat(displayZScore.toFixed(2)), // Z-Score dinamis sesuai masalah
+    zScoreLabel: displayLabel,
     status,
     color,
     description: desc,
@@ -73,10 +117,22 @@ function analyzeToddler(ageMonths: number, weight: number, height: number, gende
 }
 
 // ==========================================
-// 2. RUMUS KHUSUS DEWASA (> 19 Tahun) - Menggunakan BMI Statis
+// 2. RUMUS DEWASA (Logic Sederhana BMI)
 // ==========================================
 function analyzeAdult(weight: number, height: number): AnalysisResult {
   const heightM = height / 100;
+  
+  if (heightM < 0.5 || heightM > 3.0) {
+     return {
+        category: 'Dewasa',
+        bmi: 0,
+        status: 'Data Tidak Valid',
+        color: 'text-gray-500',
+        description: 'Tinggi badan tidak valid.',
+        recommendation: 'Cek input tinggi badan.'
+     };
+  }
+
   const bmi = parseFloat((weight / (heightM * heightM)).toFixed(1));
 
   let status = '';
@@ -85,30 +141,32 @@ function analyzeAdult(weight: number, height: number): AnalysisResult {
   let rec = '';
 
   if (bmi < 18.5) {
-    status = 'Kekurangan Berat Badan (Underweight)';
+    status = 'Berat Kurang (Underweight)';
     color = 'text-orange-500';
-    desc = 'BMI di bawah 18.5. Tubuh terlalu kurus.';
-    rec = 'Tingkatkan asupan kalori dengan makanan padat energi & protein. Latihan beban untuk massa otot.';
+    desc = 'BMI di bawah 18.5.';
+    rec = 'Tingkatkan asupan kalori padat gizi & latihan beban.';
   } else if (bmi >= 18.5 && bmi <= 24.9) {
-    status = 'Berat Badan Normal';
+    status = 'Berat Normal';
     color = 'text-green-600';
-    desc = 'BMI ideal (18.5 - 24.9).';
-    rec = 'Pertahankan pola hidup sehat, olahraga rutin 150 menit/minggu.';
+    desc = 'BMI ideal.';
+    rec = 'Pertahankan pola hidup sehat.';
   } else if (bmi >= 25 && bmi <= 29.9) {
-    status = 'Kelebihan Berat Badan (Overweight)';
+    status = 'Berat Berlebih (Overweight)';
     color = 'text-yellow-600';
     desc = 'BMI antara 25 - 29.9.';
-    rec = 'Mulai kurangi kalori harian (defisit kalori). Kurangi gorengan dan gula.';
+    rec = 'Defisit kalori ringan dan kurangi gula.';
   } else {
     status = 'Obesitas';
     color = 'text-red-600';
-    desc = 'BMI di atas 30. Berisiko penyakit metabolik.';
-    rec = 'Konsultasi diet. Fokus pada whole foods, perbanyak sayur, dan aktif bergerak setiap hari.';
+    desc = 'BMI di atas 30.';
+    rec = 'Konsultasi diet dan rutin olahraga.';
   }
 
   return {
     category: 'Dewasa',
     bmi,
+    zScore: 0, 
+    zScoreLabel: 'BMI',
     status,
     color,
     description: desc,
@@ -116,39 +174,21 @@ function analyzeAdult(weight: number, height: number): AnalysisResult {
   };
 }
 
-// ==========================================
-// FUNGSI UTAMA (MAIN)
-// ==========================================
+// --- MAIN FUNCTION ---
 export const assessNutritionalStatus = (
   ageMonths: number,
   weight: number,
   height: number,
   gender: 'male' | 'female'
 ): AnalysisResult => {
-  
-  // LOGIKA PEMBAGIAN KATEGORI
   if (ageMonths <= 60) {
-    // 0 - 5 Tahun: Pakai Standar WHO Balita (LMS)
     return analyzeToddler(ageMonths, weight, height, gender);
-  } 
-  else {
-    // Di atas 5 tahun
-    // CATATAN: Idealnya 5-19 tahun pakai WHO Reference 2007 (Z-Score juga).
-    // Tapi karena kita belum punya datanya, kita anggap masuk fase transisi/dewasa 
-    // atau Anda bisa menambahkan logic khusus nanti.
-    // Untuk saat ini kita arahkan ke Adult Logic tapi beri catatan.
-    
+  } else {
     const result = analyzeAdult(weight, height);
-    if (ageMonths < 228) { // Di bawah 19 tahun
+    if (ageMonths < 228) {
        result.category = 'Anak/Remaja (5-19 Tahun)';
-       result.description += ' (Catatan: Menggunakan standar BMI umum karena data WHO 2007 belum tersedia).';
+       result.description += ' (Menggunakan standar BMI umum).';
     }
     return result;
   }
 };
-
-// --- Helper Rumus LMS ---
-function calculateLMS(val: number, L: number, M: number, S: number) {
-  if (Math.abs(L) < 0.01) return Math.log(val / M) / S;
-  return (Math.pow(val / M, L) - 1) / (L * S);
-}

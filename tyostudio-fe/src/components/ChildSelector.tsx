@@ -33,7 +33,7 @@ const ChildSelector: React.FC<ChildSelectorProps> = ({
                     onChange={(e) => onSelect(e.target.value)}
                     className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
                 >
-                    <option value="" disabled>-- Pilih Data Anak --</option>
+                    <option value="" disabled>   Pilih Data Anak </option>
                     {(!childrenData || childrenData.length === 0) ? (
                         <option value="" disabled>Belum ada data anak</option>
                     ) : (
