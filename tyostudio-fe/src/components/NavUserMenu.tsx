@@ -27,7 +27,7 @@ export default function NavUserMenu({ user }: NavUserMenuProps) {
           </div>
           <div className="hidden md:block">
             <p className="text-sm font-bold text-gray-700 leading-none hover:text-[var(--primary-color)]">
-              Halo, {user.user_metadata?.full_name || 'Bunda'}
+              Halo, {user.user_metadata?.full_name?.split(' ')[0] || 'Bunda'}
             </p>
           </div>
         </Link>
