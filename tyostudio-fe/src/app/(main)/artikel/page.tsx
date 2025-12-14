@@ -7,7 +7,7 @@ import {
   Search, Clock, User, ChevronRight, BookOpen,
   Baby, Utensils, Milk, Sprout,
   Users, GraduationCap, Leaf, LayoutGrid, Stethoscope,
-  SlidersHorizontal, X, Sparkles
+  SlidersHorizontal, X, Sparkles, CalendarDays
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { articlesData } from '@/data/articles';
@@ -71,41 +71,32 @@ export default function ArtikelPage() {
     <div className="min-h-screen bg-[#F8F9FA] pb-24">
 
       {/* --- HEADER SECTION (CENTERED & MODERN) --- */}
-      <div className="bg-white pt-16 pb-12 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] border-b border-gray-100 relative overflow-hidden">
+      {/* --- HEADER SECTION (CENTERED & MODERN) --- */}
+      <div className="bg-teal-500 pt-12 pb-10 md:pt-16 md:pb-12 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] border-b border-gray-100 rounded-b-[2.5rem] md:rounded-b-[5rem] relative overflow-hidden">
 
         {/* Dekorasi Background Gradient Halus */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1 }}
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-teal-50/60 to-transparent rounded-full blur-3xl -z-10 pointer-events-none"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] md:w-[800px] md:h-[500px] bg-gradient-to-b from-teal-50/60 to-transparent rounded-full blur-3xl -z-10 pointer-events-none"
         />
 
         <div className="container mx-auto max-w-4xl px-4 text-center relative z-10">
-
-          <motion.span
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-[10px] font-bold tracking-widest uppercase border border-teal-100 mb-6"
-          >
-            <Sparkles size={12} /> Pusat Edukasi
-          </motion.span>
-
           <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.7 }}
-            className="text-4xl md:text-5xl font-black text-gray-900 mb-6 leading-[1.2] tracking-tight"
+            className="text-3xl md:text-5xl font-black text-white mb-4 md:mb-6 leading-[1.2] tracking-tight"
           >
-            Panduan Tumbuh Kembang <br className="hidden md:block" /> & Nutrisi Si Kecil
+            Panduan Tumbuh Kembang <br className="hidden md:block" /> dan Nutrisi Si Kecil
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="text-gray-500 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-10 font-light"
+            className="text-teal-50 text-base md:text-xl leading-relaxed max-w-2xl mx-auto mb-8 md:mb-10 font-light"
           >
             Temukan ribuan artikel terpercaya, resep MPASI, dan tips kesehatan untuk mencegah stunting sejak dini.
           </motion.p>
@@ -117,13 +108,13 @@ export default function ArtikelPage() {
             transition={{ delay: 0.5, type: "spring", stiffness: 100 }}
             className="relative max-w-xl mx-auto group"
           >
-            <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
-              <Search className="text-gray-400 group-focus-within:text-[var(--primary-color)] transition-colors" size={24} />
+            <div className="absolute inset-y-0 left-0 pl-5 md:pl-6 flex items-center pointer-events-none">
+              <Search className="text-gray-400 group-focus-within:text-[var(--primary-color)] transition-colors" size={20} />
             </div>
             <input
               type="text"
               placeholder="Cari artikel, resep, atau topik kesehatan..."
-              className="w-full pl-16 pr-6 py-4.5 rounded-full bg-white border-2 border-gray-100 focus:border-[var(--primary-color)] focus:ring-4 focus:ring-teal-50/50 outline-none transition-all text-base font-medium shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] placeholder:font-normal h-[64px]"
+              className="w-full pl-12 md:pl-16 pr-5 md:pr-6 py-3.5 md:py-4.5 rounded-full bg-white border-2 border-gray-100 focus:border-[var(--primary-color)] focus:ring-4 focus:ring-teal-50/50 outline-none transition-all text-sm md:text-base font-medium shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] placeholder:font-normal h-[50px] md:h-[64px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -132,20 +123,20 @@ export default function ArtikelPage() {
       </div>
 
       {/* --- MAIN CONTENT --- */}
-      <div className="container mx-auto max-w-6xl px-4 md:px-8 py-10">
+      <div className="container mx-auto max-w-6xl px-4 md:px-8 py-8 md:py-10">
 
         {/* --- STICKY FLOATING FILTER BAR --- */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="sticky top-4 z-30 mb-8"
+          className="sticky top-4 z-30 mb-6 md:mb-8"
         >
           <div className="bg-white/80 backdrop-blur-xl p-3 rounded-2xl shadow-lg shadow-gray-200/50 border border-white/50 flex flex-wrap items-center justify-between gap-4">
 
             {/* Info Hasil */}
             <div className="flex items-center gap-3 pl-2">
-              <div className="h-8 w-1 bg-[var(--primary-color)] rounded-full"></div>
+              <div className="h-6 w-1 md:h-8 bg-[var(--primary-color)] rounded-full"></div>
               <div>
                 <h2 className="font-bold text-gray-800 text-sm md:text-base leading-tight">
                   {activeCategory === 'Semua' ? 'Jelajahi Artikel' : activeCategory}
@@ -157,13 +148,13 @@ export default function ArtikelPage() {
             {/* Tombol Toggle Filter */}
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border shadow-sm ${isFilterOpen || activeCategory !== 'Semua'
+              className={`flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all border shadow-sm ml-auto ${isFilterOpen || activeCategory !== 'Semua'
                 ? 'bg-teal-50 text-teal-700 border-teal-200'
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                 }`}
             >
-              {isFilterOpen ? <X size={18} strokeWidth={2.5} /> : <SlidersHorizontal size={18} strokeWidth={2.5} />}
-              {activeCategory !== 'Semua' ? 'Ubah Filter' : 'Filter Topik'}
+              {isFilterOpen ? <X size={16} strokeWidth={2.5} /> : <SlidersHorizontal size={16} strokeWidth={2.5} />}
+              {activeCategory !== 'Semua' ? 'Ubah Filter' : 'Filter'}
             </button>
           </div>
 
@@ -238,21 +229,20 @@ export default function ArtikelPage() {
                   <Link
                     href={`/artikel/${article.id}`}
                     style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', MozBackfaceVisibility: 'hidden' }}
-                    className="group bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-[0_2px_20px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.06)] hover:-translate-y-2 transition-all duration-500 flex flex-col h-full transform-gpu isolate"
+                    className="group bg-white rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col h-full"
                   >
                     {/* Image Area */}
-                    <div className="relative h-60 overflow-hidden rounded-t-[2rem]">
-                      {/* BAGIAN YANG DIHAPUS: Div animate-pulse di sini telah dihilangkan */}
+                    <div className="relative h-48 overflow-hidden">
                       <Image
                         src={article.image}
                         alt={article.title}
-                        width={800}
-                        height={600}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        width={600}
+                        height={400}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
                       {/* Glassmorphism Badge */}
-                      <div className="absolute top-4 left-4">
-                        <span className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-bold text-gray-800 shadow-sm flex items-center gap-1.5 border border-white/40">
+                      <div className="absolute top-3 left-3">
+                        <span className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-bold text-gray-800 shadow-sm flex items-center gap-1.5 border border-white/40">
                           {getCategoryConfig(article.category).icon}
                           {article.category}
                         </span>
@@ -260,40 +250,16 @@ export default function ArtikelPage() {
                     </div>
 
                     {/* Content Area */}
-                    <div className="p-6 flex flex-col flex-grow relative">
-                      {/* Decorative Line */}
-                      <div className="absolute top-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-gray-100 to-transparent"></div>
-
-                      <div className="flex items-center gap-3 text-[11px] text-gray-400 mb-3 font-semibold uppercase tracking-wider">
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} className="text-[var(--primary-color)]" /> {article.readTime}
-                        </span>
-                        <span className="text-gray-300">•</span>
+                    <div className="p-5 flex flex-col flex-grow">
+                      {/* Metadata (Date only) */}
+                      <div className="flex items-center gap-2 text-[10px] text-gray-400 mb-2 font-medium uppercase tracking-wider">
+                        <CalendarDays size={12} strokeWidth={2} />
                         <span>{article.date}</span>
                       </div>
 
-                      <h3 className="text-xl font-bold text-gray-800 mb-3 line-clamp-2 leading-snug group-hover:text-[var(--primary-color)] transition-colors">
+                      <h3 className="text-lg font-bold text-gray-800 line-clamp-2 leading-snug group-hover:text-teal-600 transition-colors">
                         {article.title}
                       </h3>
-
-                      <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 mb-6 flex-grow font-light">
-                        {article.excerpt}
-                      </p>
-
-                      <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 border border-gray-100 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
-                            <User size={14} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-gray-400 font-bold uppercase">Penulis</span>
-                            <span className="text-xs font-bold text-gray-700 truncate max-w-[100px]">{article.author}</span>
-                          </div>
-                        </div>
-                        <span className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--primary-color)] group-hover:text-white transition-all duration-300">
-                          <ChevronRight size={16} />
-                        </span>
-                      </div>
                     </div>
                   </Link>
                 </motion.div>

@@ -129,7 +129,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
   const chartData = useMemo(() => {
     const maxUserMonth = growthRecords.length > 0 ? Math.max(...growthRecords.map(r => r.age_in_months)) : 0;
-    const maxMonth = Math.max(36, maxUserMonth + 1); 
+    const maxMonth = Math.max(36, maxUserMonth + 1);
 
     const data = [];
 
@@ -159,7 +159,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
       }
 
       data.push({
-        age: m, 
+        age: m,
         label: `${m} Bln`,
         heightIdeal: stdPoint.heightIdeal,
         heightBorder: stdPoint.heightBorder,
@@ -233,7 +233,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
   }, [child?.id]);
 
   const handleRetry = () => {
-    setHasGenerated(false); 
+    setHasGenerated(false);
     fetchingRef.current = false;
     fetchRecommendations();
   };
@@ -261,7 +261,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         {/* Child Selector & Add Button */}
         {/* PERUBAHAN UTAMA DI SINI: items-end agar sejajar dengan input box, bukan label */}
         <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-end">
-          
+
           {allChildren && allChildren.length > 0 && (
             <div className="w-full md:w-64">
               <ChildSelector

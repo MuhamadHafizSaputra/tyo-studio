@@ -292,8 +292,8 @@ export default function CekNutrisiPage() {
 
                         {/* Personalization Controls - Only for Logged In Users */}
                         {user && (
-                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-orange-100 w-full lg:w-auto flex flex-col sm:flex-row gap-4">
-                                <div className="min-w-[200px]">
+                            <div className="bg-white p-3 rounded-2xl w-full lg:w-auto flex flex-col lg:flex-row gap-4">
+                                <div className="min-w-[200px] h-100">
                                     <ChildSelector
                                         childrenData={children}
                                         selectedId={selectedChildId}
@@ -346,13 +346,13 @@ export default function CekNutrisiPage() {
                                 onClick={addInput}
                                 className="flex-1 py-3 px-6 border-2 border-dashed border-gray-300 text-gray-500 font-semibold rounded-xl hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] hover:bg-teal-50 transition-all flex items-center justify-center gap-2"
                             >
-                                + Tambah Makanan
+                                Tambah Makanan
                             </button>
                             <button
                                 onClick={calculateNutrition}
-                                className="flex-1 py-3 px-6 bg-[var(--primary-color)] text-white font-bold rounded-xl shadow-lg shadow-teal-200 hover:bg-teal-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                                className="flex-1 py-3 px-6 bg-[var(--primary-color)] text-white font-bold rounded-xl hover:bg-teal-700 hover:scale-[1.01] transition-all flex items-center justify-center gap-2"
                             >
-                                🔍 Hitung Nutrisi
+                                Hitung Nutrisi
                             </button>
                         </div>
                     </div>
