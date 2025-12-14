@@ -298,7 +298,7 @@ export default function CekNutrisiPage() {
                                         childrenData={children}
                                         selectedId={selectedChildId}
                                         onSelect={setSelectedChildId}
-                                        label="👤 Pilih Si Kecil"
+                                        label="Pilih Si Kecil"
                                     />
                                 </div>
 
@@ -312,7 +312,7 @@ export default function CekNutrisiPage() {
                     {/* Input Section */}
                     <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-10">
                         <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                            🍽️ Input Makanan
+                            Input Makanan
                             <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Ketik nama makanan (cth: Bubur Nasi, Pisang)</span>
                         </h3>
 
@@ -364,7 +364,7 @@ export default function CekNutrisiPage() {
                             {/* Table */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                                 <div className="p-6 border-b border-gray-100">
-                                    <h3 className="text-xl font-bold text-gray-800">📊 Hasil Perhitungan</h3>
+                                    <h3 className="text-xl font-bold text-gray-800">Hasil Perhitungan</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
@@ -418,12 +418,12 @@ export default function CekNutrisiPage() {
                                 {/* Status Box */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                     <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                        🩺 Analisis Singkat
+                                        Analisis Nutrisi
                                     </h4>
                                     <ul className="space-y-3">
                                         {/* Calorie Check */}
+                                        {/* Calorie Check */}
                                         <li className="flex gap-3 text-sm items-start">
-                                            <span className="text-xl mt-0.5">{total.cal > dailyNeeds.cal ? '⚠️' : '✅'}</span>
                                             <div>
                                                 <span className="font-semibold block">Kalori: {Math.round((total.cal / dailyNeeds.cal) * 100)}% dari kebutuhan ({dailyNeeds.cal} kcal)</span>
                                                 <span className="text-gray-500">
@@ -435,7 +435,6 @@ export default function CekNutrisiPage() {
                                         </li>
                                         {/* Protein Check */}
                                         <li className="flex gap-3 text-sm items-start">
-                                            <span className="text-xl mt-0.5">{total.prot < dailyNeeds.prot * 0.8 ? '🥩' : '💪'}</span>
                                             <div>
                                                 <span className="font-semibold block">Protein: {Math.round((total.prot / dailyNeeds.prot) * 100)}% terpenuhi ({dailyNeeds.prot}g)</span>
                                                 <span className="text-gray-500">
@@ -451,7 +450,7 @@ export default function CekNutrisiPage() {
                                 {/* Suggestions Box */}
                                 <div className="bg-[var(--secondary-color)]/5 border border-rose-100 p-6 rounded-2xl">
                                     <h4 className="font-bold text-rose-700 mb-4 flex items-center gap-2">
-                                        💡 Rekomendasi
+                                        Rekomendasi Gizi
                                     </h4>
                                     <div className="text-gray-700 text-sm space-y-3">
                                         {total.cal > dailyNeeds.cal && (
@@ -464,7 +463,7 @@ export default function CekNutrisiPage() {
                                             <p>• <strong>Tambah Lauk Pauk:</strong> Tambahkan telur, tempe, atau ikan.</p>
                                         )}
                                         {(total.cal <= dailyNeeds.cal && total.fat <= dailyNeeds.fat && total.prot >= dailyNeeds.prot)
-                                            ? <p className="text-green-700 font-medium">✨ Pola makan seimbang!</p>
+                                            ? <p className="text-green-700 font-medium">Pola makan seimbang!</p>
                                             : <p>• Perbanyak sayuran serat tinggi.</p>
                                         }
                                     </div>

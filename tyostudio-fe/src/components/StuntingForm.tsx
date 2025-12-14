@@ -275,9 +275,6 @@ export default function StuntingForm({
         )}
 
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 text-xl">
-            👤
-          </div>
           <h2 className="text-xl font-bold text-gray-800">Data Si Kecil</h2>
         </div>
 
@@ -314,11 +311,10 @@ export default function StuntingForm({
             <div className="flex-1">
               <label className="block text-sm font-bold text-gray-700 mb-2">Berat Badan (kg)</label>
               <div className="relative">
-                <span className="absolute left-3 top-3.5 text-gray-400 text-sm">⚖️</span>
                 <input
                   type="number"
                   step="0.1"
-                  className="w-full pl-9 p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                  className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
                   placeholder="11"
                   value={formData.weight}
                   onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
@@ -329,11 +325,10 @@ export default function StuntingForm({
             <div className="flex-1">
               <label className="block text-sm font-bold text-gray-700 mb-2">Tinggi Badan (cm)</label>
               <div className="relative">
-                <span className="absolute left-3 top-3.5 text-gray-400 text-sm">📏</span>
                 <input
                   type="number"
                   step="0.1"
-                  className="w-full pl-9 p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                  className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
                   placeholder="70"
                   value={formData.height}
                   onChange={(e) => setFormData({ ...formData, height: e.target.value })}
@@ -394,7 +389,7 @@ export default function StuntingForm({
         {result && (
           <div>
             <h3 className="font-bold text-gray-800 text-xl mb-4 flex items-center gap-2">
-              <span>🍽️</span> Rekomendasi Menu Gizi Seimbang
+              Rekomendasi Menu Gizi Seimbang
             </h3>
 
             {aiLoading ? (
@@ -410,7 +405,7 @@ export default function StuntingForm({
                       {item.image_url ? (
                         <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
-                        <span>🥘</span>
+                        <span>M</span>
                       )}
                     </div>
                     <div className="p-4">

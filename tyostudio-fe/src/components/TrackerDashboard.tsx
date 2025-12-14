@@ -12,7 +12,7 @@ import { ClipboardList, PlusCircle, Trash2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { generateFoodRecommendations } from '@/app/actions/gemini';
-import { Loader2, MapPin, Sparkles } from 'lucide-react';
+import { Loader2, MapPin, Sparkles, Utensils, ChefHat, Flame, Dumbbell, AlertTriangle, Salad, Soup, Info, TriangleAlert } from 'lucide-react';
 
 interface TrackerDashboardProps {
   user: any;
@@ -469,7 +469,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
           {/* Info Box */}
           <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
-            <span className="text-xl">💡</span>
+            <Info size={24} className="text-blue-500" />
             <p className="text-sm text-blue-800 leading-relaxed">
               <strong>Tips:</strong> Klik tab di atas grafik untuk beralih antara melihat tren Berat Badan, Tinggi Badan, atau skor standar deviasi (Z-Score) secara detail.
             </p>
@@ -480,8 +480,8 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         <div className="h-full">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col max-h-[500px]">
             <div className="flex justify-between items-center mb-5 border-b border-gray-50 pb-2 shrink-0">
-              <h3 className="font-bold text-gray-800 text-sm tracking-widest uppercase">
-                🍽️ Menu Rekomendasi
+              <h3 className="font-bold text-gray-800 text-sm tracking-widest uppercase flex items-center gap-2">
+                <Utensils size={16} className="text-orange-500" /> Menu Rekomendasi
               </h3>
               {userLocation && (
                 <div className="flex items-center gap-1 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded-full">
@@ -495,7 +495,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
               {!loadingRecs && !errorRecs && recommendations.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-center p-4 opacity-70">
-                  <div className="text-3xl mb-2 grayscale">🥘</div>
+                  <div className="text-3xl mb-2 grayscale opacity-50"><ChefHat size={32} /></div>
                   <p className="text-xs text-gray-500 max-w-[200px] leading-relaxed">
                     {growthRecords.length === 0
                       ? "Catat data tumbuh kembang dulu untuk dapat rekomendasi."
@@ -506,7 +506,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
               {errorRecs && (
                 <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                  <div className="text-3xl mb-2">⚠️</div>
+                  <div className="text-3xl mb-2 text-red-500"><TriangleAlert size={32} /></div>
                   <p className="text-xs text-red-500 mb-4 max-w-[200px]">
                     {errorRecs || "Gagal memuat rekomendasi."}
                   </p>
@@ -540,14 +540,14 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               {recommendations.map((item, idx) => (
                 <div key={idx} className="flex gap-4 items-start p-3 hover:bg-gray-50 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-100 animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
                   <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-lg flex items-center justify-center text-2xl shrink-0 shadow-sm border border-orange-100">
-                    {idx === 0 ? '🍳' : idx === 1 ? '🍱' : idx === 2 ? '🥗' : '🥣'}
+                    {idx === 0 ? <ChefHat size={20} /> : idx === 1 ? <Utensils size={20} /> : idx === 2 ? <Salad size={20} /> : <Soup size={20} />}
                   </div>
                   <div>
                     <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
                     <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.description}</p>
                     <div className="flex gap-2 mt-2">
-                      <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-bold border border-orange-100">🔥 {item.calories} kkal</span>
-                      <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">💪 P: {item.protein}g</span>
+                      <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-bold border border-orange-100 flex items-center gap-1"><Flame size={10} /> {item.calories} kkal</span>
+                      <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100 flex items-center gap-1"><Dumbbell size={10} /> P: {item.protein}g</span>
                     </div>
                   </div>
                 </div>

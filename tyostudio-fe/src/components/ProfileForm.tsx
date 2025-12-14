@@ -27,7 +27,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
 
   const [childrenList, setChildrenList] = useState<any[]>(initialChildren || []);
   const [selectedChildId, setSelectedChildId] = useState<string | 'new'>('new');
-  
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [childToDelete, setChildToDelete] = useState<{ id: string, name: string } | null>(null);
 
@@ -69,12 +69,12 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
 
   const handleSaveChild = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!childForm.name || !childForm.date_of_birth) {
-       toast.error("Nama dan Tanggal Lahir wajib diisi");
-       return;
+    if (!childForm.name || !childForm.date_of_birth) {
+      toast.error("Nama dan Tanggal Lahir wajib diisi");
+      return;
     }
     setChildLoading(true);
-    
+
     const payload = {
       user_id: user.id,
       name: childForm.name,
@@ -127,32 +127,32 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full max-w-6xl mx-auto">
-      
+
       {/* === KIRI: KARTU PROFIL ORANG TUA === */}
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-white rounded-3xl shadow-xl shadow-teal-900/5 overflow-hidden border border-gray-100 relative">
           {/* Header Card Decoration */}
           <div className="h-24 bg-gradient-to-br from-teal-50 to-emerald-50 relative">
-             <div className="absolute top-4 right-4 text-teal-200/50"><User size={64} /></div>
+            <div className="absolute top-4 right-4 text-teal-200/50"><User size={64} /></div>
           </div>
-          
+
           <div className="px-6 pb-8 relative -mt-12">
             <div className="flex flex-col items-center mb-6">
-               <div className="w-24 h-24 bg-white p-1.5 rounded-full shadow-lg mb-3">
-                  <div className="w-full h-full bg-gradient-to-br from-teal-100 to-teal-200 rounded-full flex items-center justify-center text-3xl font-bold text-teal-700">
-                    {parentName ? parentName[0].toUpperCase() : <User />}
-                  </div>
-               </div>
-               <h2 className="text-xl font-bold text-gray-800">{parentName || 'Bunda'}</h2>
-               <p className="text-sm text-gray-400 font-medium">{user.email}</p>
+              <div className="w-24 h-24 bg-white p-1.5 rounded-full shadow-lg mb-3">
+                <div className="w-full h-full bg-gradient-to-br from-teal-100 to-teal-200 rounded-full flex items-center justify-center text-3xl font-bold text-teal-700">
+                  {parentName ? parentName[0].toUpperCase() : <User />}
+                </div>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">{parentName || 'Bunda'}</h2>
+              <p className="text-sm text-gray-400 font-medium">{user.email}</p>
             </div>
 
             <form onSubmit={handleSaveParent} className="space-y-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Nama Lengkap</label>
                 <div className="relative group">
-                   <User className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
-                   <input
+                  <User className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
+                  <input
                     type="text"
                     value={parentName}
                     onChange={(e) => setParentName(e.target.value)}
@@ -166,8 +166,8 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Lokasi Tempat Tinggal</label>
                 <div className="relative group">
-                   <MapPin className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
-                   <input
+                  <MapPin className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
+                  <input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
@@ -177,9 +177,9 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
                 </div>
               </div>
               {/* ----------------------------------------------------- */}
-              
-              <button 
-                type="submit" 
+
+              <button
+                type="submit"
                 disabled={parentLoading}
                 className="w-full py-3.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-bold rounded-xl transition-all shadow-lg hover:shadow-gray-900/20 flex justify-center items-center gap-2 mt-2"
               >
@@ -199,23 +199,22 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
 
       {/* === KANAN: MANAJEMEN ANAK === */}
       <div className="lg:col-span-8 space-y-8">
-        
+
         {/* SECTION 1: List Anak */}
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl shadow-teal-900/5 border border-gray-100">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                 Data Si Kecil <span className="text-sm font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{childrenList.length}</span>
+                Data Si Kecil <span className="text-sm font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{childrenList.length}</span>
               </h2>
               <p className="text-sm text-gray-500 mt-1">Pilih profil anak untuk mengedit atau menambah data baru.</p>
             </div>
             <button
               onClick={() => handleSelectChild('new')}
-              className={`group flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm border ${
-                selectedChildId === 'new' 
-                ? 'bg-[var(--primary-color)] text-white border-transparent shadow-teal-200' 
-                : 'bg-white text-gray-600 border-gray-200 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]'
-              }`}
+              className={`group flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm border ${selectedChildId === 'new'
+                  ? 'bg-[var(--primary-color)] text-white border-transparent shadow-teal-200'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]'
+                }`}
             >
               <Plus size={16} className={`transition-transform group-hover:rotate-90`} /> Tambah Anak
             </button>
@@ -223,30 +222,28 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {childrenList.map((child) => {
-               const isSelected = selectedChildId === child.id;
-               const isBoy = (child.gender === 'male' || child.gender === 'Laki-laki');
-               return (
-                <div 
+              const isSelected = selectedChildId === child.id;
+              const isBoy = (child.gender === 'male' || child.gender === 'Laki-laki');
+              return (
+                <div
                   key={child.id}
                   onClick={() => handleSelectChild(child.id)}
-                  className={`relative group cursor-pointer p-4 rounded-2xl border-2 transition-all duration-300 ease-out hover:-translate-y-1 ${
-                    isSelected
+                  className={`relative group cursor-pointer p-4 rounded-2xl border-2 transition-all duration-300 ease-out hover:-translate-y-1 ${isSelected
                       ? 'border-[var(--primary-color)] bg-teal-50/30 shadow-md ring-2 ring-teal-100 ring-offset-2'
                       : 'border-gray-100 bg-white hover:border-teal-100 hover:shadow-lg hover:shadow-teal-900/5'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-inner ${
-                      isBoy ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'
-                    }`}>
-                      {isBoy ? '👦' : '👧'}
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-inner ${isBoy ? 'bg-teal-50 text-teal-600' : 'bg-teal-50 text-teal-600'
+                      }`}>
+                      <User size={24} />
                     </div>
                     <div className="overflow-hidden">
                       <p className={`font-bold truncate text-base ${isSelected ? 'text-[var(--primary-color)]' : 'text-gray-700'}`}>{child.name}</p>
                       <p className="text-xs text-gray-400 truncate font-medium">Lahir: {new Date(child.date_of_birth).getFullYear()}</p>
                     </div>
                   </div>
-                  
+
                   {/* Tombol Hapus (Muncul saat Hover) */}
                   <button
                     onClick={(e) => { e.stopPropagation(); setChildToDelete(child); setShowDeleteModal(true); }}
@@ -256,14 +253,14 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
                     <Trash2 size={14} />
                   </button>
                 </div>
-               );
+              );
             })}
-            
+
             {/* Empty State dalam Grid */}
             {childrenList.length === 0 && (
               <div className="col-span-full py-10 text-center border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
-                   <Baby size={32} className="text-gray-300" />
+                  <Baby size={32} className="text-gray-300" />
                 </div>
                 <p className="text-gray-500 font-medium">Belum ada data anak.</p>
                 <p className="text-xs text-gray-400">Tekan tombol "Tambah Anak" di atas.</p>
@@ -297,7 +294,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
                   type="text"
                   name="name"
                   value={childForm.name}
-                  onChange={(e) => setChildForm({...childForm, name: e.target.value})}
+                  onChange={(e) => setChildForm({ ...childForm, name: e.target.value })}
                   className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all font-semibold text-gray-800 placeholder-gray-300"
                   placeholder="Contoh: Muhammad Altaf"
                 />
@@ -310,7 +307,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
                   type="date"
                   name="date_of_birth"
                   value={childForm.date_of_birth}
-                  onChange={(e) => setChildForm({...childForm, date_of_birth: e.target.value})}
+                  onChange={(e) => setChildForm({ ...childForm, date_of_birth: e.target.value })}
                   className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all font-medium text-gray-700"
                 />
               </div>
@@ -319,27 +316,26 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase ml-1">Jenis Kelamin</label>
                 <div className="flex gap-3 h-[58px]">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setChildForm({ ...childForm, gender: 'male' })}
                     className={`flex-1 rounded-2xl border-2 flex items-center justify-center gap-2 transition-all font-bold text-sm ${
                       childForm.gender === 'male' 
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' 
+                      ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' 
                       : 'border-gray-100 bg-gray-50 text-gray-400 hover:bg-gray-100'
                     }`}
                   >
-                    <span>👦</span> Laki-laki
+                    <User size={18} /> Laki-laki
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setChildForm({ ...childForm, gender: 'female' })}
-                    className={`flex-1 rounded-2xl border-2 flex items-center justify-center gap-2 transition-all font-bold text-sm ${
-                      childForm.gender === 'female' 
-                      ? 'border-pink-500 bg-pink-50 text-pink-700 shadow-sm' 
-                      : 'border-gray-100 bg-gray-50 text-gray-400 hover:bg-gray-100'
-                    }`}
+                    className={`flex-1 rounded-2xl border-2 flex items-center justify-center gap-2 transition-all font-bold text-sm ${childForm.gender === 'female'
+                        ? 'border-pink-500 bg-pink-50 text-pink-700 shadow-sm'
+                        : 'border-gray-100 bg-gray-50 text-gray-400 hover:bg-gray-100'
+                      }`}
                   >
-                    <span>👧</span> Perempuan
+                    <User size={18} /> Perempuan
                   </button>
                 </div>
               </div>
@@ -348,12 +344,12 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase ml-1">Berat Lahir (kg)</label>
                 <div className="relative">
-                   <input
+                  <input
                     type="number"
                     step="0.1"
                     name="birth_weight"
                     value={childForm.birth_weight}
-                    onChange={(e) => setChildForm({...childForm, birth_weight: e.target.value})}
+                    onChange={(e) => setChildForm({ ...childForm, birth_weight: e.target.value })}
                     className="w-full p-4 pl-4 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all font-bold text-gray-800 placeholder-gray-300"
                     placeholder="0.0"
                   />
@@ -364,12 +360,12 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase ml-1">Tinggi Lahir (cm)</label>
                 <div className="relative">
-                   <input
+                  <input
                     type="number"
                     step="0.1"
                     name="birth_height"
                     value={childForm.birth_height}
-                    onChange={(e) => setChildForm({...childForm, birth_height: e.target.value})}
+                    onChange={(e) => setChildForm({ ...childForm, birth_height: e.target.value })}
                     className="w-full p-4 pl-4 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all font-bold text-gray-800 placeholder-gray-300"
                     placeholder="0.0"
                   />
@@ -409,7 +405,7 @@ export default function ProfileForm({ user, initialParentName, initialLocation, 
             </div>
             <h3 className="text-2xl font-bold text-center text-gray-800 mb-2">Hapus Data?</h3>
             <p className="text-gray-500 text-center mb-8 leading-relaxed">
-              Anda yakin ingin menghapus data <strong className="text-gray-900">{childToDelete.name}</strong>? <br/>Tindakan ini tidak bisa dibatalkan.
+              Anda yakin ingin menghapus data <strong className="text-gray-900">{childToDelete.name}</strong>? <br />Tindakan ini tidak bisa dibatalkan.
             </p>
             <div className="flex gap-3">
               <button
