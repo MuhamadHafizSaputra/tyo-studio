@@ -121,9 +121,7 @@ export default function HomePage() {
                   <p className="text-xs md:text-sm text-gray-400 font-semibold uppercase tracking-wider mb-1">Pertumbuhan Berat</p>
                   <h3 className="text-2xl md:text-3xl font-bold text-gray-900">10.4 <span className="text-base md:text-lg font-medium text-gray-500">kg</span></h3>
                 </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-xl md:text-2xl">
-                  👶
-                </div>
+                
               </div>
 
               {/* Chart */}
