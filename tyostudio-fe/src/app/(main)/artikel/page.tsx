@@ -9,16 +9,16 @@ import {
   Users, GraduationCap, Leaf, LayoutGrid, Stethoscope,
   SlidersHorizontal, X, Sparkles, CalendarDays
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { articlesData } from '@/data/articles';
 
 // Animation Variants
-const fadeInUp = {
+const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
 };
 
-const staggerContainer = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -189,7 +189,7 @@ export default function ArtikelPage() {
                               }`}
                           >
                             <span className={`flex items-center justify-center w-6 h-6 rounded-full ${isActive ? 'bg-white/20' : config.color.split(' ')[0]}`}>
-                              {React.cloneElement(config.icon as React.ReactElement, {
+                              {React.cloneElement(config.icon as React.ReactElement<any>, {
                                 size: 14,
                                 className: isActive ? 'text-white' : config.color.split(' ')[1].replace('text-', 'text-')
                               })}

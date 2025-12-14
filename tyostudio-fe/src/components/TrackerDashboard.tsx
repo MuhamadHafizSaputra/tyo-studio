@@ -31,10 +31,16 @@ const standardData = [
   { month: 24, heightIdeal: 88, heightBorder: 81, weightIdeal: 12.2, weightBorder: 9.7 },
   { month: 30, heightIdeal: 92, heightBorder: 85, weightIdeal: 13.3, weightBorder: 10.5 },
   { month: 36, heightIdeal: 96, heightBorder: 89, weightIdeal: 14.3, weightBorder: 11.3 },
+  // Tambahan data sampai 5 tahun (60 bulan) - Estimasi WHO Boys
+  { month: 48, heightIdeal: 103, heightBorder: 96, weightIdeal: 16.3, weightBorder: 12.7 },
+  { month: 60, heightIdeal: 110, heightBorder: 102, weightIdeal: 18.3, weightBorder: 14.1 },
 ];
 
 const CustomTooltip = ({ active, payload, label, mode }: any) => {
   if (active && payload && payload.length) {
+    // Access original data point directly to ensure we get all values even if line is hidden/not active
+    const data = payload[0].payload;
+
     return (
       <div className="bg-white p-4 border border-gray-100 shadow-xl rounded-xl text-sm min-w-[180px] z-50 font-sans">
         <p className="font-bold text-gray-800 text-base mb-3 border-b-2 border-gray-100 pb-2">
@@ -43,32 +49,32 @@ const CustomTooltip = ({ active, payload, label, mode }: any) => {
 
         {mode === 'height' && (
           <div className="space-y-1.5">
-            <p className="text-[#10B981] font-semibold flex justify-between">
-              <span>Ideal:</span> <span>{payload[0].value} cm</span>
-            </p>
-            {payload[1] && (
+            {data.heightChild !== null && (
               <p className="text-[#3B82F6] font-semibold flex justify-between">
-                <span>Anak:</span> <span>{payload[1].value} cm</span>
+                <span>Anak:</span> <span>{data.heightChild} cm</span>
               </p>
             )}
+            <p className="text-[#10B981] font-semibold flex justify-between">
+              <span>Ideal:</span> <span>{data.heightIdeal} cm</span>
+            </p>
             <p className="text-[#F87171] font-semibold flex justify-between">
-              <span>Batas Stunting:</span> <span>{payload[2]?.value || '-'} cm</span>
+              <span>Batas Stunting:</span> <span>{data.heightBorder || '-'} cm</span>
             </p>
           </div>
         )}
 
         {mode === 'weight' && (
           <div className="space-y-1.5">
-            <p className="text-[#10B981] font-semibold flex justify-between">
-              <span>Ideal:</span> <span>{payload[0].value} kg</span>
-            </p>
-            {payload[1] && (
+            {data.weightChild !== null && (
               <p className="text-[#3B82F6] font-semibold flex justify-between">
-                <span>Anak:</span> <span>{payload[1].value} kg</span>
+                <span>Anak:</span> <span>{data.weightChild} kg</span>
               </p>
             )}
+            <p className="text-[#10B981] font-semibold flex justify-between">
+              <span>Ideal:</span> <span>{data.weightIdeal} kg</span>
+            </p>
             <p className="text-[#F87171] font-semibold flex justify-between">
-              <span>Batas Kurus:</span> <span>{payload[2]?.value || '-'} kg</span>
+              <span>Batas Kurus:</span> <span>{data.weightBorder || '-'} kg</span>
             </p>
           </div>
         )}
@@ -76,7 +82,7 @@ const CustomTooltip = ({ active, payload, label, mode }: any) => {
         {mode === 'zscore' && (
           <div className="space-y-2">
             <p className="text-[#3B82F6] font-bold text-lg border-b border-gray-50 pb-1">
-              {payload[0]?.value} SD
+              {data.zScore ?? '-'} SD
             </p>
           </div>
         )}
@@ -89,6 +95,7 @@ const CustomTooltip = ({ active, payload, label, mode }: any) => {
 export default function TrackerDashboard({ user, child, allChildren, growthRecords, userLocation = 'Indonesia' }: TrackerDashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'height' | 'weight' | 'zscore'>('height');
+  const [timeRange, setTimeRange] = useState<'3m' | '6m' | '1y' | 'all'>('6m'); // Default 6 bulan
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Recommendations State
@@ -127,13 +134,18 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     setDeleteRecordId(null);
   };
 
-  const chartData = useMemo(() => {
+  const maxMonth = useMemo(() => {
     const maxUserMonth = growthRecords.length > 0 ? Math.max(...growthRecords.map(r => r.age_in_months)) : 0;
-    const maxMonth = Math.max(36, maxUserMonth + 1);
+    return Math.max(60, maxUserMonth + 1); // Extend default view to 60 months (5 years)
+  }, [growthRecords]);
+
+  const chartData = useMemo(() => {
+
 
     const data = [];
 
-    for (let m = 0; m <= maxMonth; m++) {
+    // Helper: Interpolate data for months that don't have exact standard data points
+    const interpolateData = (m: number) => {
       const lower = standardData.filter(d => d.month <= m).pop() || standardData[0];
       const upper = standardData.find(d => d.month >= m) || standardData[standardData.length - 1];
 
@@ -144,13 +156,18 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
       const lerp = (start: number, end: number) => start + (end - start) * fraction;
 
-      const stdPoint = {
+      return {
         heightIdeal: parseFloat(lerp(lower.heightIdeal, upper.heightIdeal).toFixed(1)),
         heightBorder: parseFloat(lerp(lower.heightBorder, upper.heightBorder).toFixed(1)),
         weightIdeal: parseFloat(lerp(lower.weightIdeal, upper.weightIdeal).toFixed(1)),
         weightBorder: parseFloat(lerp(lower.weightBorder, upper.weightBorder).toFixed(1)),
       };
+    };
 
+    // Loop ALWAYS from 0 to maxMonth. 
+    // We do NOT filter the data here anymore. Zooming is handled by XAxis domain.
+    for (let m = 0; m <= maxMonth; m++) {
+      const stdPoint = standardData.find(d => d.month === m) || interpolateData(m);
       const userRec = growthRecords.find(r => Math.round(r.age_in_months) === m);
 
       let zScore = null;
@@ -173,6 +190,28 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
 
     return data;
   }, [growthRecords]);
+
+  // Calculate X-Axis Domain for Zooming
+  // Calculate X-Axis Domain for Zooming
+  const xAxisDomain = useMemo(() => {
+    // If showing all, or no records, show full range 0-maxMonth
+    if (timeRange === 'all' || growthRecords.length === 0) return [0, maxMonth];
+
+    const lastRecordAge = growthRecords[growthRecords.length - 1].age_in_months;
+    const currentAge = Math.ceil(lastRecordAge);
+    let minAge = 0;
+
+    switch (timeRange) {
+      case '3m': minAge = Math.max(0, currentAge - 3); break;
+      case '6m': minAge = Math.max(0, currentAge - 6); break;
+      case '1y': minAge = Math.max(0, currentAge - 12); break;
+    }
+
+    // Return [min, max]. We rely on 'auto' for max to include all data effectively, 
+    // or we can clamp it to currentAge + padding if we want to zoom in strictly.
+    // Let's restrict it to around the child's current age for better focus.
+    return [minAge, currentAge + 1];
+  }, [timeRange, growthRecords, maxMonth]) as [number, number];
 
   const fetchRecommendations = async () => {
     if (!child || growthRecords.length === 0 || fetchingRef.current || hasGenerated) return;
@@ -244,11 +283,23 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
       {/* --- HEADER PROFILE & SELECTOR --- */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-3xl shadow-sm">👶</div>
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-3xl shadow-sm">
+            {/* Logic Avatar Based on Age & Gender */}
+            {(() => {
+              const latestAge = growthRecords.length > 0 ? growthRecords[growthRecords.length - 1].age_in_months : 0;
+              const isBaby = latestAge < 24; // Under 2 years = Baby
+              const gender = child?.gender?.toLowerCase();
+
+              if (isBaby) return '👶';
+              return gender === 'male' || gender === 'laki-laki' ? '👦' : '👧';
+            })()}
+          </div>
           <div>
             <h2 className="font-bold text-gray-800 text-2xl">{child?.name || 'Si Kecil'}</h2>
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase tracking-wide">{child?.gender || '-'}</span>
+              <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase tracking-wide">
+                {child?.gender === 'male' ? 'Laki-laki' : child?.gender === 'female' ? 'Perempuan' : child?.gender || '-'}
+              </span>
               {child?.date_of_birth && (
                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                   🎂 {new Date(child.date_of_birth).toLocaleDateString('id-ID')}
@@ -291,27 +342,46 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             {/* Header Chart Tabs */}
-            <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+            <div className="flex flex-col gap-4 mb-6">
               <h3 className="font-bold text-gray-800 text-lg">Grafik Pertumbuhan</h3>
-              <div className="flex bg-gray-100 p-1 rounded-lg">
-                <button
-                  onClick={() => setActiveTab('height')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'height' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Tinggi
-                </button>
-                <button
-                  onClick={() => setActiveTab('weight')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'weight' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Berat
-                </button>
-                <button
-                  onClick={() => setActiveTab('zscore')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'zscore' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Z-Score
-                </button>
+              <div className="flex flex-wrap gap-3 items-center justify-between w-full">
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                  <button
+                    onClick={() => setActiveTab('height')}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'height' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Tinggi
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('weight')}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'weight' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Berat
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('zscore')}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'zscore' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Z-Score
+                  </button>
+                </div>
+
+                {/* Time Range Filter - Dropdown */}
+                <div className="relative">
+                  <select
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value as any)}
+                    className="appearance-none bg-white border border-gray-200 text-gray-700 text-sm font-bold py-2 pl-4 pr-8 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent cursor-pointer"
+                  >
+                    <option value="3m">3 Bulan Terakhir</option>
+                    <option value="6m">6 Bulan Terakhir</option>
+                    <option value="1y">1 Tahun Terakhir</option>
+                    <option value="all">Semua Riwayat</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -320,33 +390,42 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} interval="preserveStartEnd" minTickGap={30} />
+                  <XAxis
+                    dataKey="age"
+                    type="number"
+                    domain={xAxisDomain}
+                    allowDataOverflow={true}
+                    tickFormatter={(val) => `${val} Bln`}
+                    stroke="#9CA3AF"
+                    tick={{ fontSize: 12 }}
+                    interval="preserveStartEnd"
+                  />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dx={-10} />
                   <Tooltip content={<CustomTooltip mode={activeTab} />} cursor={{ stroke: '#E5E7EB', strokeWidth: 2 }} />
 
                   {/* MODE TINGGI BADAN */}
                   {activeTab === 'height' && (
                     <>
-                      <Line type="monotone" dataKey="heightIdeal" stroke="#10B981" strokeWidth={2.5}
-                        dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }} name="Ideal" />
+                      <Line type="monotone" dataKey="heightIdeal" stroke="#10B981" strokeWidth={2}
+                        dot={{ r: 2, fill: '#10B981', strokeWidth: 1, stroke: '#fff' }} name="Ideal" />
+
+                      <Line type="monotone" dataKey="heightBorder" stroke="#F87171" strokeDasharray="4 4" strokeWidth={1.5}
+                        dot={{ r: 0, fill: '#F87171', strokeWidth: 0, stroke: '#fff' }} name="Batas" />
 
                       <Line type="monotone" dataKey="heightChild" stroke="#3B82F6" strokeWidth={3} connectNulls
-                        dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} name="Anak" />
-
-                      <Line type="monotone" dataKey="heightBorder" stroke="#F87171" strokeDasharray="6 6" strokeWidth={2}
-                        dot={{ r: 4, fill: '#F87171', strokeWidth: 2, stroke: '#fff' }} name="Batas" />
+                        dot={{ r: 3, fill: '#3B82F6', strokeWidth: 2, stroke: '#fff' }} name="Anak" />
                     </>
                   )}
 
                   {/* MODE BERAT BADAN */}
                   {activeTab === 'weight' && (
                     <>
-                      <Line type="monotone" dataKey="weightIdeal" stroke="#10B981" strokeWidth={2.5}
-                        dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }} />
+                      <Line type="monotone" dataKey="weightIdeal" stroke="#10B981" strokeWidth={2}
+                        dot={{ r: 2, fill: '#10B981', strokeWidth: 1, stroke: '#fff' }} />
+                      <Line type="monotone" dataKey="weightBorder" stroke="#F87171" strokeDasharray="4 4" strokeWidth={1.5}
+                        dot={{ r: 0, fill: '#F87171', strokeWidth: 0, stroke: '#fff' }} />
                       <Line type="monotone" dataKey="weightChild" stroke="#3B82F6" strokeWidth={3} connectNulls
-                        dot={{ r: 5, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }} />
-                      <Line type="monotone" dataKey="weightBorder" stroke="#F87171" strokeDasharray="6 6" strokeWidth={2}
-                        dot={{ r: 4, fill: '#F87171', strokeWidth: 2, stroke: '#fff' }} />
+                        dot={{ r: 3, fill: '#3B82F6', strokeWidth: 2, stroke: '#fff' }} />
                     </>
                   )}
 
