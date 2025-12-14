@@ -1,11 +1,11 @@
 import Hero from '../../components/Hero';
-import Features from '../../components/Features'; // Komponen Baru
+import Features from '../../components/Features';
 import FoodCard from '../../components/FoodCard';
 import BiometricSection from '../../components/BiometricSection';
-import HowItWorks from '../../components/HowItWorks'; // Komponen Baru
+import HowItWorks from '../../components/HowItWorks';
+import Link from 'next/link'; // Jangan lupa import Link
 
 function LandingPage() {
-  // Data dummy saran nutrisi 
   const recommendedMeals = [
     { id: 1, name: 'Sop Ikan Batam', image: 'https://images.unsplash.com/photo-1623851722837-d2a84a25036f?auto=format&fit=crop&w=400&q=80' },
     { id: 2, name: 'Bubur Kacang Ijo', image: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=400&q=80' },
@@ -14,7 +14,7 @@ function LandingPage() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-white">
       <main className="flex-grow">
         <Hero />
       </main>
@@ -23,4 +23,3 @@ function LandingPage() {
 }
 
 export default LandingPage;
-// Forces rebuild
