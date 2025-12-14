@@ -134,9 +134,13 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     setDeleteRecordId(null);
   };
 
-  const chartData = useMemo(() => {
+  const maxMonth = useMemo(() => {
     const maxUserMonth = growthRecords.length > 0 ? Math.max(...growthRecords.map(r => r.age_in_months)) : 0;
-    const maxMonth = Math.max(60, maxUserMonth + 1); // Extend default view to 60 months (5 years)
+    return Math.max(60, maxUserMonth + 1); // Extend default view to 60 months (5 years)
+  }, [growthRecords]);
+
+  const chartData = useMemo(() => {
+
 
     const data = [];
 
@@ -188,9 +192,10 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
   }, [growthRecords]);
 
   // Calculate X-Axis Domain for Zooming
+  // Calculate X-Axis Domain for Zooming
   const xAxisDomain = useMemo(() => {
-    // If showing all, or no records, show full range 0-60
-    if (timeRange === 'all' || growthRecords.length === 0) return [0, 'auto'];
+    // If showing all, or no records, show full range 0-maxMonth
+    if (timeRange === 'all' || growthRecords.length === 0) return [0, maxMonth];
 
     const lastRecordAge = growthRecords[growthRecords.length - 1].age_in_months;
     const currentAge = Math.ceil(lastRecordAge);
@@ -206,7 +211,7 @@ export default function TrackerDashboard({ user, child, allChildren, growthRecor
     // or we can clamp it to currentAge + padding if we want to zoom in strictly.
     // Let's restrict it to around the child's current age for better focus.
     return [minAge, currentAge + 1];
-  }, [timeRange, growthRecords]);
+  }, [timeRange, growthRecords, maxMonth]) as [number, number];
 
   const fetchRecommendations = async () => {
     if (!child || growthRecords.length === 0 || fetchingRef.current || hasGenerated) return;
